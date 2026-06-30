@@ -271,8 +271,10 @@ A round of robustness/quality improvements with tests. Status:
 | 4 | **Deterministic ₹/number formatting** | ✅ Done | Tools return a `price_spoken`/`total_spoken` form (`num2words` en_IN); prompt no longer asks the LLM to convert digits. Unit-tested in `test_formatting.py`. |
 | 5 | **Robust retrieval** (fuzzy product search) | ✅ Done | `rapidfuzz` min-token coverage over name+subcategory+colors (threshold 68), with split-word rescue. Absent products now return nothing — **fixed the hallucination bug from #1** (its eval is now a normal pass). Unit-tested in `test_retrieval.py`. |
 | 6 | **Per-step LLM routing** (NVIDIA tools / Gemini reply) | ✅ Done | `ShopMaxAgent.llm_node` routes tool-decision turns → NVIDIA, post-tool reply → Gemini (`_select_route`), each with the other as fallback. Toggle via `route_llms`. Tested in `test_llm_routing.py`. *Note: while Gemini's quota is exhausted the reply step transparently falls back to NVIDIA, so the quality benefit only shows once Gemini has quota.* |
-| 7 | **Structured metrics export** | ⏳ Pending | Replace print-logs with a queryable sink. |
-| 8 | **Secrets / CI hygiene** | ⏳ Pending | `git init`, key rotation, CI to run evals. |
+| 7 | **Structured metrics export** | ✅ Done | `_MetricsRecorder` writes one JSON object per metric event to `METRICS_JSONL` (kinds: `turn`/`llm`/`tts`), alongside the human logs. Verified live (16 records). Unit-tested in `test_metrics.py`. OTel suggested for production. |
+| 8 | **Secrets / CI hygiene** | ✅ Done | `git init` + initial commit with `.env`/secrets and `frontend/` (separate starter) gitignored — verified excluded before commit. `.github/workflows/ci.yml`: fast unit job (`-m "not llm"`, no keys) on every push + gated nightly LLM-eval job. LLM evals auto-retry (`pytest-rerunfailures`) to absorb model nondeterminism. **Rotate the API keys** — they were shared in chat. |
+
+**Test suite: 28 passed** (16 network-free unit + 12 live-LLM evals). Run: `pytest` (all) or `pytest -m "not llm"` (fast, no keys).
 
 ---
 

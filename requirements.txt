@@ -1,0 +1,11 @@
+livekit==1.1.12
+livekit-agents==1.6.4
+livekit-api==1.1.1
+livekit-plugins-google==1.6.4
+livekit-plugins-deepgram==1.6.4
+livekit-plugins-cartesia==1.6.4
+livekit-plugins-openai==1.6.4
+google-genai==2.10.0
+num2words==0.5.14
+rapidfuzz==3.14.5
+python-dotenv==1.2.2

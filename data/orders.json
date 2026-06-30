@@ -1,0 +1,106 @@
+[
+  {
+    "order_id": "ORD1001",
+    "customer_name": "Priya Sharma",
+    "status": "delivered",
+    "items": [
+      {"product_id": "P001", "name": "Classic Cotton Kurta", "qty": 1, "color": "white", "size": "M"}
+    ],
+    "total": 1299,
+    "placed_on": "2026-06-20",
+    "delivered_on": "2026-06-24",
+    "shipping_city": "Mumbai"
+  },
+  {
+    "order_id": "ORD1002",
+    "customer_name": "Rahul Verma",
+    "status": "shipped",
+    "items": [
+      {"product_id": "P008", "name": "Wireless Noise-Cancelling Headphones", "qty": 1, "color": "matte black", "size": "one size"},
+      {"product_id": "P011", "name": "USB-C Fast Charger 65W", "qty": 1, "color": "white", "size": "one size"}
+    ],
+    "total": 9798,
+    "placed_on": "2026-06-27",
+    "estimated_delivery": "2026-07-02",
+    "tracking_number": "DTDC9876543210",
+    "shipping_city": "Bangalore"
+  },
+  {
+    "order_id": "ORD1003",
+    "customer_name": "Ananya Iyer",
+    "status": "processing",
+    "items": [
+      {"product_id": "P006", "name": "Embroidered Silk Saree", "qty": 1, "color": "maroon", "size": "free size"}
+    ],
+    "total": 5999,
+    "placed_on": "2026-06-29",
+    "estimated_delivery": "2026-07-05",
+    "shipping_city": "Chennai"
+  },
+  {
+    "order_id": "ORD1004",
+    "customer_name": "Vikram Patel",
+    "status": "cancelled",
+    "items": [
+      {"product_id": "P012", "name": "Wireless Earbuds Pro", "qty": 1, "color": "white", "size": "one size"}
+    ],
+    "total": 4999,
+    "placed_on": "2026-06-25",
+    "cancelled_on": "2026-06-26",
+    "cancel_reason": "Customer requested cancellation — item out of stock",
+    "shipping_city": "Delhi"
+  },
+  {
+    "order_id": "ORD1005",
+    "customer_name": "Meera Reddy",
+    "status": "shipped",
+    "items": [
+      {"product_id": "P016", "name": "Handwoven Cotton Throw Blanket", "qty": 2, "color": "mustard", "size": "130x170 cm"},
+      {"product_id": "P023", "name": "Block Print Cushion Covers (Set of 4)", "qty": 1, "color": "indigo", "size": "45x45 cm"}
+    ],
+    "total": 5297,
+    "placed_on": "2026-06-26",
+    "estimated_delivery": "2026-07-01",
+    "tracking_number": "BLUEDART1122334455",
+    "shipping_city": "Hyderabad"
+  },
+  {
+    "order_id": "ORD1006",
+    "customer_name": "Arjun Nair",
+    "status": "delivered",
+    "items": [
+      {"product_id": "P005", "name": "Running Sports Shoes", "qty": 1, "color": "black/white", "size": "9"},
+      {"product_id": "P024", "name": "Oversized Graphic T-Shirt", "qty": 2, "color": "black", "size": "L"}
+    ],
+    "total": 4597,
+    "placed_on": "2026-06-18",
+    "delivered_on": "2026-06-22",
+    "shipping_city": "Pune"
+  },
+  {
+    "order_id": "ORD1007",
+    "customer_name": "Deepa Gupta",
+    "status": "return_requested",
+    "items": [
+      {"product_id": "P017", "name": "Ceramic Dinner Set (16 pcs)", "qty": 1, "color": "white with blue rim", "size": "16 piece set"}
+    ],
+    "total": 3499,
+    "placed_on": "2026-06-15",
+    "delivered_on": "2026-06-19",
+    "return_reason": "Two plates arrived with chips on the rim",
+    "shipping_city": "Kolkata"
+  },
+  {
+    "order_id": "ORD1008",
+    "customer_name": "Karthik Menon",
+    "status": "processing",
+    "items": [
+      {"product_id": "P015", "name": "Smartwatch Ultra", "qty": 1, "color": "titanium grey", "size": "one size"},
+      {"product_id": "P009", "name": "Smart Fitness Band", "qty": 1, "color": "black", "size": "one size"}
+    ],
+    "total": 11498,
+    "placed_on": "2026-06-30",
+    "estimated_delivery": "2026-07-06",
+    "shipping_city": "Jaipur"
+  }
+]

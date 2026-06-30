@@ -1,0 +1,33 @@
+# Secrets — never commit
+.env
+.env.local
+**/.env
+**/.env.local
+!.env.example
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Node / frontend
+node_modules/
+.next/
+frontend/node_modules/
+frontend/.next/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Local Claude Code settings (machine-specific)
+.claude/
+
+# Frontend is a separately-cloned LiveKit React starter with its own .git
+# history. Kept out of this backend repo to avoid a broken submodule gitlink.
+# To vendor it in, remove frontend/.git and delete this line.
+/frontend/
+
+# Runtime metrics output
+*.jsonl

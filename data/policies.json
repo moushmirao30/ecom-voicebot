@@ -1,0 +1,52 @@
+[
+  {
+    "topic": "return_policy",
+    "title": "Return Policy",
+    "content": "ShopMax offers a 7-day easy return policy from the date of delivery. Items must be unused, unwashed, and in original packaging with all tags attached. Electronics must be returned with all accessories, manuals, and original packaging. Refunds are processed within 5-7 business days after the returned item is received and inspected. To initiate a return, provide your order ID and our team will arrange a pickup from your address at no extra cost."
+  },
+  {
+    "topic": "refund_policy",
+    "title": "Refund Policy",
+    "content": "Refunds are credited back to the original payment method. UPI and debit card refunds take 5-7 business days. Credit card refunds may take up to 10 business days depending on your bank. Cash on Delivery orders are refunded via bank transfer — customers need to provide their bank account details. Partial refunds are issued if only some items from a multi-item order are returned."
+  },
+  {
+    "topic": "shipping_policy",
+    "title": "Shipping Policy",
+    "content": "ShopMax delivers across India. Standard delivery takes 4-7 business days. Metro cities like Mumbai, Delhi, Bangalore, Chennai, Hyderabad, and Kolkata typically receive orders in 3-5 business days. Free shipping is available on orders above 999 rupees. Orders below 999 rupees have a flat shipping charge of 49 rupees. Express delivery is available in select cities for an additional 149 rupees with delivery in 1-2 business days."
+  },
+  {
+    "topic": "payment_methods",
+    "title": "Payment Methods",
+    "content": "ShopMax accepts UPI payments including Google Pay, PhonePe, and Paytm. We also accept all major credit and debit cards including Visa, Mastercard, and RuPay. Net banking is available for most Indian banks. Cash on Delivery is available for orders up to 10,000 rupees. EMI options are available on select credit cards for orders above 3,000 rupees."
+  },
+  {
+    "topic": "exchange_policy",
+    "title": "Exchange Policy",
+    "content": "Size and color exchanges are free within 7 days of delivery. You can exchange for the same product in a different size or color, subject to availability. If the desired size or color is not available, you can opt for a full refund instead. Exchanges are not available for electronics, innerwear, or customized products. To request an exchange, provide your order ID and the preferred size or color."
+  },
+  {
+    "topic": "order_cancellation",
+    "title": "Order Cancellation Policy",
+    "content": "Orders can be cancelled before they are shipped. Once an order is shipped, it cannot be cancelled but can be returned after delivery. To cancel an order, provide the order ID. Refunds for cancelled orders are processed within 2-3 business days. If payment was made via Cash on Delivery, no refund is needed for cancelled orders."
+  },
+  {
+    "topic": "customer_support",
+    "title": "Customer Support",
+    "content": "ShopMax customer support is available Monday to Saturday from 9 AM to 9 PM IST. You can reach us through this voice assistant for product queries, order tracking, and policy questions. For complex issues like damaged products or payment disputes, our support team can be reached at support@shopmax.in. We aim to resolve all queries within 24 hours."
+  },
+  {
+    "topic": "product_warranty",
+    "title": "Product Warranty",
+    "content": "Electronics products come with a minimum 1-year manufacturer warranty. Warranty covers manufacturing defects but not physical damage, water damage, or misuse. Fashion and home products do not carry a warranty but are covered under the 7-day return policy for any quality issues. Warranty claims should be raised directly with the manufacturer using the warranty card included in the package."
+  },
+  {
+    "topic": "loyalty_program",
+    "title": "ShopMax Rewards Program",
+    "content": "ShopMax Rewards members earn 1 point for every 10 rupees spent. Points can be redeemed on future purchases where 100 points equal 10 rupees discount. Members also get early access to sales and exclusive member-only deals. Signing up is free and can be done during checkout. Points expire after 12 months of inactivity."
+  },
+  {
+    "topic": "damaged_product",
+    "title": "Damaged or Defective Products",
+    "content": "If you receive a damaged or defective product, please report it within 48 hours of delivery. Provide your order ID and share a photo of the damage if possible. We will arrange a free pickup and send a replacement or issue a full refund at your choice. For electronics with manufacturing defects found after 48 hours but within warranty period, please contact the manufacturer directly."
+  }
+]

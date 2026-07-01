@@ -36,8 +36,13 @@ def test_route_resets_to_tool_on_next_user_turn():
     assert _select_route(ctx) == "tool"
 
 
-def test_build_routed_llms_returns_distinct_pair():
-    # Both provider keys are configured in .env, so routing is available.
+def test_build_routed_llms_returns_distinct_pair(monkeypatch):
+    # Routing needs BOTH providers configured. Set dummy keys so this exercises
+    # the branch deterministically without live secrets (constructors don't hit
+    # the network) — CI's unit run has no real keys, and .env may vary locally.
+    monkeypatch.setenv("GEMINI_API_KEY", "test-dummy")
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-dummy")
+    monkeypatch.setenv("NVIDIA_API_KEY", "test-dummy")
     tool_llm, reply_llm = build_routed_llms()
     assert tool_llm is not None and reply_llm is not None
     assert tool_llm is not reply_llm

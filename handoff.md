@@ -15,7 +15,7 @@ This document serves as the single source of truth for the LiveKit E-Commerce Vo
 | **Phase 3.5** | Design System & Product Surface | "Suggested Direction" palette/typography, animated hero, live product grid + cart | Post-Phase-3 | 🟢 **COMPLETE** |
 | **Phase 4** | Deploy & Package | Cloud deployment, Demo video, Case study | Days 9–13 | 🟡 **IN PROGRESS** |
 
-> **▶ Next up (Phase 4):** ~~(1) live end-to-end run~~ ✅ **Done 2026-07-02** — all four flows passed in one session (products grid → add-to-cart → spoken cart total → verified order card → no-results state), driven via the chat input (same agent pipeline minus STT). **It caught and fixed a real bug:** Google's API began rejecting request deadlines under 10s, so `FallbackAdapter`'s default `attempt_timeout=5.0` made **every** Gemini call fail with 400 `INVALID_ARGUMENT` and silently fall back to NVIDIA. Fixed by passing `attempt_timeout=10.0` to all three adapters in `agent.py`; re-verified live — Gemini now serves with zero fallback switches. ~~(2) deploy to LiveKit Cloud~~ ✅ **Done 2026-07-02** — agent `CA_52WcohugKh5g` deployed via `lk agent create` (remote Docker build, region `ap-south`, 2 CPU / 4GB, secrets uploaded minus LIVEKIT_* which the platform injects). `Dockerfile`, `.dockerignore`, and `livekit.toml` are committed. Verified live: with **no local agent running**, connecting the frontend dispatched the cloud agent — greeting, `product_search`, and the product panel all worked. `lk` CLI (v2.16.7) lives at `~/bin/lk` in WSL, project auth saved as `ecom-voicebot`. Remaining: (3) **host the frontend** — needs a Vercel/Netlify login (interactive; run `npx vercel` in `frontend/`, set `LIVEKIT_URL`/`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` as env vars); local `pnpm dev` remains fine for demos. (4) record the 60–90s demo video, (5) draft the root README/case study, plus the other 9 full-flow runs (ideally voice-driven, against the deployed stack).
+> **▶ Next up (Phase 4):** ~~(1) live end-to-end run~~ ✅ **Done 2026-07-02** — all four flows passed in one session (products grid → add-to-cart → spoken cart total → verified order card → no-results state), driven via the chat input (same agent pipeline minus STT). **It caught and fixed a real bug:** Google's API began rejecting request deadlines under 10s, so `FallbackAdapter`'s default `attempt_timeout=5.0` made **every** Gemini call fail with 400 `INVALID_ARGUMENT` and silently fall back to NVIDIA. Fixed by passing `attempt_timeout=10.0` to all three adapters in `agent.py`; re-verified live — Gemini now serves with zero fallback switches. ~~(2) deploy to LiveKit Cloud~~ ✅ **Done 2026-07-02** — agent `CA_52WcohugKh5g` deployed via `lk agent create` (remote Docker build, region `ap-south`, 2 CPU / 4GB, secrets uploaded minus LIVEKIT_* which the platform injects). `Dockerfile`, `.dockerignore`, and `livekit.toml` are committed. Verified live: with **no local agent running**, connecting the frontend dispatched the cloud agent — greeting, `product_search`, and the product panel all worked. `lk` CLI (v2.16.7) lives at `~/bin/lk` in WSL, project auth saved as `ecom-voicebot`. ~~(3) host the frontend~~ ✅ **Done 2026-07-02** — frontend deployed to **Vercel** at **https://ecom-voicebot-frontend.vercel.app/**. Key fix: the upstream LiveKit starter's `/api/token` route had a hard `NODE_ENV !== 'development'` guard that threw a 500 on every production request — removed and replaced with a TODO comment for adding real auth. `feat/ui-suggested-direction` merged into `main` on the frontend repo. **Vercel env vars** (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`) must be set in the Vercel dashboard → Settings → Environment Variables for the token endpoint to work. Remaining: (4) record the 60–90s demo video, (5) draft the root README/case study, (6) **deploy `agent.py` to a cloud host** so the bot responds without a local process (see **Agent Cloud Hosting** below), plus the other 9 full-flow runs (ideally voice-driven, against the deployed stack).
 
 ---
 
@@ -288,8 +288,10 @@ pytest                                                    # ~17s, hits NVIDIA
   - [x] Fix transcript auto-scroll "chat freeze" bug.
 
 ### Phase 4: Deploy & Package (Days 9–13)
-* [ ] **Deployment (Day 9 - ~5 hr):**
-  - [ ] Deploy voice agent to LiveKit Cloud.
+* [x] **Deployment (Day 9 - ~5 hr):**
+  - [x] Deploy voice agent to LiveKit Cloud.
+  - [x] Deploy frontend to Vercel (token route production fix, branch merged to `main`).
+  - [ ] Deploy `agent.py` to a persistent cloud host (Railway/Render/VPS) — see **Agent Cloud Hosting** below.
   - [ ] Perform 10x full-flow runs and fix UX friction points.
 * [ ] **Branded Showcase & Demo (Days 10–11 - ~10 hr):**
   - [ ] Construct a mock storefront layout.
@@ -319,9 +321,33 @@ A round of robustness/quality improvements with tests. Status:
 
 > **GitHub (both repos private, CI green):**
 > - **Backend** `moushmirao30/ecom-voicebot` — `main` (baseline + hardening) and `feat/ui-suggested-direction` (all Phase-3.5 work: streams, cart tool, catalog images, this doc), both pushed. One CI fix landed post-first-push: `test_build_routed_llms_returns_distinct_pair` assumed both provider keys existed (true only with a local `.env`) — made key-independent via `monkeypatch` so the keyless unit job passes.
-> - **Frontend** `moushmirao30/ecom-voicebot-frontend` — `main` (starter base) and `feat/ui-suggested-direction` (design system, hero, product panel, persona badge), both pushed. Local `origin` still points at upstream `livekit-examples/agent-starter-react`; push via the `myfork` remote.
-> - Neither feature branch is merged to `main` yet — open PRs when ready:
->   `github.com/moushmirao30/ecom-voicebot/pull/new/feat/ui-suggested-direction` · `github.com/moushmirao30/ecom-voicebot-frontend/pull/new/feat/ui-suggested-direction`
+> - **Frontend** `moushmirao30/ecom-voicebot-frontend` — `feat/ui-suggested-direction` **merged into `main`** (2026-07-02). Deployed to **Vercel** at `https://ecom-voicebot-frontend.vercel.app/`. Token route production fix included in the merge. Local `origin` still points at upstream `livekit-examples/agent-starter-react`; push via the `myfork` remote.
+> - **Backend** feature branch not yet merged to `main` — open PR when ready:
+>   `github.com/moushmirao30/ecom-voicebot/pull/new/feat/ui-suggested-direction`
+
+---
+
+## ☁️ Agent Cloud Hosting
+
+The frontend (Vercel) and agent (`agent.py`) **never talk directly** — both connect independently to **LiveKit Cloud**, which bridges them in real-time. The agent must be a **long-running process** (not serverless).
+
+| Component | Deployed to | Connects to |
+|---|---|---|
+| Frontend (Next.js) | Vercel (`ecom-voicebot-frontend.vercel.app`) | LiveKit Cloud (generates JWT via `/api/token`) |
+| Agent (`agent.py`) | Needs a persistent host (see below) | LiveKit Cloud (WebSocket, auto-joins rooms) |
+
+**Recommended options (easiest first):**
+
+1. **Railway** (recommended) — connect GitHub repo, auto-detects `Dockerfile`, add env vars, deploy. Free tier ($5/mo). Container runs 24/7.
+2. **Render** — similar to Railway; use a **Background Worker** (not Web Service — the agent doesn't serve HTTP).
+3. **Google Cloud Run** — `gcloud run deploy` with `--min-instances 1` (always-on). More complex setup.
+4. **Any VPS** (DigitalOcean/EC2) — `docker build -t ecom-voicebot . && docker run -d --restart unless-stopped --env-file .env ecom-voicebot`.
+
+**Required env vars on the host (same as `.env`):** `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `DEEPGRAM_API_KEY`, `CARTESIA_API_KEY`, `GEMINI_API_KEY` (and optionally `NVIDIA_API_KEY` / `NVIDIA_LLM_MODEL`).
+
+The existing `Dockerfile` is production-ready — it installs deps, caches Silero VAD weights, and runs `python agent.py start`.
+
+> **LiveKit Cloud agent (`lk agent create`)** is an alternative if you have `lk` CLI access — the agent is already deployed as `CA_52WcohugKh5g` (region `ap-south`). See Phase 4 notes above.
 
 ---
 

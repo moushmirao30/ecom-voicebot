@@ -15,6 +15,8 @@ This document serves as the single source of truth for the LiveKit E-Commerce Vo
 | **Phase 3.5** | Design System & Product Surface | "Suggested Direction" palette/typography, animated hero, live product grid + cart | Post-Phase-3 | 🟢 **COMPLETE** |
 | **Phase 4** | Deploy & Package | Cloud deployment, Demo video, Case study | Days 9–13 | 🟡 **IN PROGRESS** |
 
+> **▶ Next up (Phase 4):** (1) a **live end-to-end run** — agent + frontend together: "show me headphones" → grid; add to cart → "what's my total?"; "track order ORD1002" → order card; a failed search → no-results state. This exercises every stream in one session and is the first of the "10 full-flow runs". Then (2) deploy to LiveKit Cloud, (3) record the 60–90s demo video, (4) draft the root README/case study.
+
 ---
 
 ## 🎯 Project Goal & Scope
@@ -37,7 +39,7 @@ The goal is to build a high-performance, low-latency, conversational voice agent
 | **Turn Detection** | Native `inference.TurnDetector` (audio-based) + Silero VAD | Built into livekit-agents 1.6.x. Audio+semantic analysis replaces deprecated text-only plugin. |
 | **Data Store** | JSON files (catalog.json + orders.json) | Zero-overhead, easy to inspect/edit. 25 products, 8 orders with Indian context (₹ prices). |
 | **Frontend** | React (LiveKit React Starter) + Motion (`motion/react`) | Transition-heavy UI (idle ➔ listening ➔ thinking ➔ speaking) for polished UX. Restyled to the **"Suggested Direction"** design system (Phase 3.5): Void/Bot/Voice/Cart/Live palette, Inter + Instrument Serif + JetBrains Mono, animated hero, and a live product grid. |
-| **Product surface** | LiveKit **text stream** (`send_text`, topic `shopmax.products`) → React `registerTextStreamHandler` | Agent pushes matched products (incl. `image_url`) to the frontend; a docked drawer renders a 2-column grid + always-visible cart total. Best-effort: no-ops in text-mode evals (no room). |
+| **Product surface** | LiveKit **text streams** (`send_text` / `registerTextStreamHandler`) on topics `shopmax.products`, `shopmax.order`, `shopmax.cart` | Agent pushes matched products (incl. `image_url`) and verified orders to the frontend; the web UI pushes cart state back so `view_cart` can answer by voice. A docked drawer renders a 2-column grid, order card, and always-visible cart total. Best-effort: no-ops in text-mode evals (no room). |
 | **Hosting & WebRTC** | LiveKit Cloud / LiveKit Agents | Low-latency WebRTC transport and SFU backend out-of-the-box. |
 
 ---
@@ -63,6 +65,12 @@ E-Com VoiceBot/
 │   └── latency_bench.py     # Mic-free latency benchmark (TTS-injected audio → live pipeline → median TTFT/TTFB/E2E)
 ├── tests/
 │   ├── test_grounding_evals.py  # Grounding/hallucination evals via LiveKit text-mode session.run()
+│   ├── test_llm_fallback.py     # Turn survives a broken primary LLM (FallbackAdapter)
+│   ├── test_llm_routing.py      # Per-step routing decisions + routed grounded turn
+│   ├── test_formatting.py       # Deterministic ₹ → spoken-words conversion
+│   ├── test_retrieval.py        # Fuzzy product-match scoring / absent-product precision
+│   ├── test_metrics.py          # JSONL metrics recorder
+│   ├── test_cart.py             # Voice-aware cart: update_cart + view_cart summary
 │   └── README.md
 ├── conftest.py              # Shared eval LLM factory (build_eval_llm / build_judge_llm)
 ├── pytest.ini               # asyncio_mode=auto, testpaths=tests
@@ -72,7 +80,8 @@ E-Com VoiceBot/
     ├── styles/globals.css   # "Suggested Direction" design tokens + palette + motion keyframes
     ├── app/layout.tsx       # Inter / Instrument Serif / JetBrains Mono fonts + rebranded header
     ├── components/app/welcome-view.tsx        # Animated hero (aurora bg, mic orb, persona "Max")
-    ├── components/agents-ui/product-panel.tsx # Live product grid + cart (subscribes to shopmax.products)
+    ├── components/agents-ui/product-panel.tsx # Results surface: product grid + order card + cart (shopmax.* topics)
+    ├── components/agents-ui/max-persona-badge.tsx # State-aware "Max" chip in the live session view
     └── package.json         # pnpm-managed; aura visualizer + branding customizations
 ```
 
@@ -80,8 +89,8 @@ E-Com VoiceBot/
 
 **Key code anchors in `agent.py`:**
 - `ShopMaxAgent` (instructions + grounding rules) — [agent.py](agent.py)
-- Tools: `product_search`, `stock_and_price_check`, `order_status_lookup`, `policy_lookup` — [agent.py](agent.py)
-- Product-surface publish: `PRODUCTS_TOPIC` + `_product_card()` + `_publish_products()` (best-effort `send_text` to the frontend; called from `product_search` and `stock_and_price_check`) — [agent.py](agent.py)
+- Tools: `product_search`, `stock_and_price_check`, `order_status_lookup`, `policy_lookup`, `view_cart` — [agent.py](agent.py)
+- Frontend-surface streams: `PRODUCTS_TOPIC`/`ORDER_TOPIC`/`CART_TOPIC`, `_publish_products()` (also publishes empty results for the no-results state), `_publish_order()` (verified path only), and the cart handler registered in the entrypoint (`update_cart`) — [agent.py](agent.py)
 - `AgentSession` config (STT/LLM/TTS/turn-detection/barge-in) — [agent.py](agent.py)
 - Latency instrumentation (E2E / TTFT / TTFB / tokens) — [agent.py](agent.py)
 - Non-blocking greeting via `asyncio.create_task` — [agent.py](agent.py)
@@ -140,7 +149,8 @@ pytest                                                    # ~17s, hits NVIDIA
   real value from the JSON (price `2499`, `ORD1001` → `delivered`, etc.).
 - **LLM-judged checks** (`accuracy_judge` / `tool_use_judge` / `relevancy_judge`)
   catch hallucination, off-topic refusal, and multi-turn grounding.
-- Current status: **22 passed** (grounding + fallback + formatting + retrieval).
+- Current status: **31 passed** — 19 network-free unit (formatting, retrieval,
+  metrics, routing, cart) + 12 live-LLM evals (grounding, fallback, routed turn).
 
 > ✅ **A real bug these evals caught and drove to a fix:** asking for "gaming
 > laptops" made the old naive `product_search` return a USB-C charger + a gaming
@@ -239,7 +249,7 @@ pytest                                                    # ~17s, hits NVIDIA
   - **Voice-aware cart (full loop):** the panel pushes cart state (`items`/`count`/`total`) to the agent over `shopmax.cart`; `agent.py` stores it (`ShopMaxAgent.update_cart`, registered in the entrypoint) and exposes a **`view_cart` tool** so Max can answer "what's in my cart?" / "what's my total?" out loud (`total_spoken` via `num2words`). Unit-tested in `tests/test_cart.py`.
   - **Polish:** staggered card entrance, image loading skeleton (fade-in), equal-height cards, a designed **no-results state** (backend now publishes empty result sets too, so the panel never silently drifts out of sync with what Max says), and a state-aware **"Max" persona badge** in the live session view (`max-persona-badge.tsx` — serif-M avatar + color-coded listening/thinking/speaking indicator, per the "name the bot, give it an avatar" principle).
 * **GitHub:** frontend pushed to a **private** repo `moushmirao30/ecom-voicebot-frontend` (branches `main` = starter base, `feat/ui-suggested-direction` = all redesign work). The local frontend keeps `origin` → upstream `livekit-examples/agent-starter-react` and pushes to the `myfork` remote.
-* **Verification:** `pnpm build` green, `tsc` clean; hero + panel + cart checked interactively (screenshots). Fixed a **pre-existing CRLF lint error** in `agent-session-block.tsx` that only surfaced under `pnpm build` (dev never lints). Backend fast suite unaffected (**16 passed**).
+* **Verification:** `pnpm build` green, `tsc` clean; hero, product grid, order card, cart, no-results state, and persona badge all checked interactively (screenshots via throwaway preview harnesses, removed after). Fixed a **pre-existing CRLF lint error** in `agent-session-block.tsx` that only surfaced under `pnpm build` (dev never lints). Backend fast suite green throughout (**19 passed** network-free).
 * **How to demo the panel:** run agent + frontend, connect, then say/type **"show me headphones"** → the agent searches, publishes, and the panel slides in.
 
 ---
@@ -307,7 +317,11 @@ A round of robustness/quality improvements with tests. Status:
 
 **Test suite: 31 passed** (19 network-free unit + 12 live-LLM evals). Run: `pytest` (all) or `pytest -m "not llm"` (fast, no keys). *(+3 from `tests/test_cart.py` for the voice-aware cart.)*
 
-> **GitHub:** backend pushed to a **private** repo `moushmirao30/ecom-voicebot` (branch `main`), backend-only (frontend is its own repo). **CI is green.** One fix landed after the first push: `test_build_routed_llms_returns_distinct_pair` assumed both provider keys existed (true only with a local `.env`) — made key-independent via `monkeypatch` so the keyless CI unit job passes. Phase-3.5 backend changes (`agent.py`, `data/catalog.json`) currently sit uncommitted on branch `feat/ui-suggested-direction`.
+> **GitHub (both repos private, CI green):**
+> - **Backend** `moushmirao30/ecom-voicebot` — `main` (baseline + hardening) and `feat/ui-suggested-direction` (all Phase-3.5 work: streams, cart tool, catalog images, this doc), both pushed. One CI fix landed post-first-push: `test_build_routed_llms_returns_distinct_pair` assumed both provider keys existed (true only with a local `.env`) — made key-independent via `monkeypatch` so the keyless unit job passes.
+> - **Frontend** `moushmirao30/ecom-voicebot-frontend` — `main` (starter base) and `feat/ui-suggested-direction` (design system, hero, product panel, persona badge), both pushed. Local `origin` still points at upstream `livekit-examples/agent-starter-react`; push via the `myfork` remote.
+> - Neither feature branch is merged to `main` yet — open PRs when ready:
+>   `github.com/moushmirao30/ecom-voicebot/pull/new/feat/ui-suggested-direction` · `github.com/moushmirao30/ecom-voicebot-frontend/pull/new/feat/ui-suggested-direction`
 
 ---
 
@@ -351,7 +365,7 @@ AGENT_LOG=/tmp/agent_bench.log python bench/latency_bench.py
 If we run behind schedule, features should be sacrificed in the following order:
 1. Telephony integration (never planned, but explicitly out of scope).
 2. FAQ RAG knowledge base.
-3. ~~Eval count.~~ ✅ **Delivered** — grounding eval suite in `tests/` (7 passed, 1 tracked xfail).
+3. ~~Eval count.~~ ✅ **Delivered** — full suite in `tests/` (31 passed: 19 unit + 12 live-LLM evals, incl. the once-xfail "gaming laptops" grounding test, fixed by retrieval hardening).
 4. Custom frontend motion transitions.
 
 ---

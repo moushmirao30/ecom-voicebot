@@ -14,6 +14,7 @@ from livekit.agents import (
     AgentSession,
     RunContext,
     function_tool,
+    get_job_context,
     inference,
 )
 from num2words import num2words
@@ -105,6 +106,62 @@ def _product_match_score(query: str, product: dict) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Frontend product surface — push matched products to the React UI over a
+# LiveKit text stream so it can render a product grid alongside the transcript.
+# Best-effort: in text-mode evals there is no room, so failures are swallowed
+# and never affect the tool result or the conversation.
+# ---------------------------------------------------------------------------
+PRODUCTS_TOPIC = "shopmax.products"
+ORDER_TOPIC = "shopmax.order"
+CART_TOPIC = "shopmax.cart"  # frontend -> agent: current on-screen cart state
+
+
+def _product_card(p: dict) -> dict:
+    """Rich, display-ready product payload for the frontend grid."""
+    return {
+        "id": p["id"],
+        "name": p["name"],
+        "category": p["category"],
+        "subcategory": p["subcategory"],
+        "price_inr": p["price"],
+        "price_spoken": _rupees_to_words(p["price"]),
+        "stock": p["stock"],
+        "in_stock": p["stock"] > 0,
+        "colors": p["colors"],
+        "sizes": p["sizes"],
+        "image_url": p.get("image_url"),
+    }
+
+
+async def _publish_products(products: list[dict], *, query: str = "") -> None:
+    """Best-effort push of product cards to the frontend over a text stream.
+    Publishes an empty list too, so the UI can show a proper no-results state
+    instead of silently keeping whatever was shown before."""
+    try:
+        room = get_job_context().room
+    except Exception:
+        return  # no active room (e.g. text-mode evals) — skip silently
+    payload = json.dumps({"query": query, "products": [_product_card(p) for p in products]})
+    try:
+        await room.local_participant.send_text(payload, topic=PRODUCTS_TOPIC)
+    except Exception as e:  # pragma: no cover - network/runtime only
+        logger.debug("product publish skipped: %s", e)
+
+
+async def _publish_order(order: dict) -> None:
+    """Best-effort push of a verified order to the frontend order card. Only call
+    on the identity-verified path so unverified lookups never surface details."""
+    try:
+        room = get_job_context().room
+    except Exception:
+        return  # no active room (e.g. text-mode evals) — skip silently
+    try:
+        await room.local_participant.send_text(json.dumps(order), topic=ORDER_TOPIC)
+    except Exception as e:  # pragma: no cover - network/runtime only
+        logger.debug("order publish skipped: %s", e)
+
+
+# ---------------------------------------------------------------------------
 # E-commerce Agent with function tools
 # ---------------------------------------------------------------------------
 class ShopMaxAgent(Agent):
@@ -129,12 +186,15 @@ class ShopMaxAgent(Agent):
                 "1. **Product search**: Find products by name, category, color, or type.\n"
                 "2. **Stock and price check**: Check if a specific product is in stock, its price, available colors and sizes.\n"
                 "3. **Order tracking**: Look up an order by its order ID (e.g. ORD1001) to check status, delivery date, or tracking info.\n"
-                "4. **Policy lookup**: Check store rules for shipping fees, return windows, cash on delivery limits, etc.\n\n"
+                "4. **Policy lookup**: Check store rules for shipping fees, return windows, cash on delivery limits, etc.\n"
+                "5. **Cart**: The shopper can add products to an on-screen cart. When they ask what's in their cart or their running total, call `view_cart`.\n\n"
                 "# Conversation style\n"
                 "- Greet warmly. Be helpful and conversational.\n"
                 "- Summarize results clearly. If multiple products match, mention the top 3-4 and ask if the user wants details on any specific one.\n"
             )
         )
+        # Latest on-screen cart state, pushed from the web UI over CART_TOPIC.
+        self._cart = {"items": [], "count": 0, "total": 0}
         # #6: per-step LLM routing — NVIDIA decides/handles tools (fast/cheap),
         # Gemini writes the user-facing reply (quality). Each falls back to the
         # other (#2). Disabled when only one provider is configured, or via
@@ -199,6 +259,9 @@ class ShopMaxAgent(Agent):
         scored.sort(key=lambda sp: sp[0], reverse=True)
         results = [product for _, product in scored[:max_results]]
 
+        # Surface the result (including "nothing found") in the frontend grid (best-effort).
+        await _publish_products(results, query=query)
+
         if not results:
             return json.dumps({"found": 0, "message": f"No products found matching '{query}'."})
 
@@ -245,6 +308,9 @@ class ShopMaxAgent(Agent):
 
         if not product:
             return json.dumps({"found": False, "message": "Product not found. Please check the product name or ID."})
+
+        # Surface this product in the frontend grid (best-effort).
+        await _publish_products([product], query=product_name or product_id or "")
 
         return json.dumps({
             "found": True,
@@ -328,7 +394,39 @@ class ShopMaxAgent(Agent):
         elif order["status"] == "return_requested":
             result["return_reason"] = order.get("return_reason")
 
+        # Surface the verified order in the frontend order card (best-effort).
+        await _publish_order(order)
+
         return json.dumps(result)
+
+    def update_cart(self, data: dict) -> None:
+        """Store the latest cart snapshot pushed from the web UI (CART_TOPIC)."""
+        self._cart = {
+            "items": data.get("items", []),
+            "count": data.get("count", 0),
+            "total": data.get("total", 0),
+        }
+
+    def _cart_summary(self) -> dict:
+        """Speak-ready view of the current cart (pure; unit-tested)."""
+        cart = self._cart
+        if not cart.get("items"):
+            return {"count": 0, "message": "The cart is currently empty."}
+        return {
+            "count": cart["count"],
+            "items": cart["items"],  # each {name, qty, price_inr}
+            "total_inr": cart["total"],
+            "total_spoken": _rupees_to_words(cart["total"]),
+        }
+
+    @function_tool()
+    async def view_cart(self, context: RunContext) -> str:
+        """Read the items currently in the shopper's on-screen cart and the total.
+
+        Use this to answer questions like "what's in my cart?", "how many items do
+        I have?", or "what's my total?". The cart lives in the web UI; this returns
+        its current contents (with a ready-to-speak total in `total_spoken`)."""
+        return json.dumps(self._cart_summary())
 
     @function_tool()
     async def policy_lookup(
@@ -420,7 +518,10 @@ def build_llm():
     have_nvidia = bool(os.environ.get("NVIDIA_API_KEY"))
     if have_gemini and have_nvidia:
         logger.info("LLM: FallbackAdapter [Gemini primary -> NVIDIA fallback]")
-        return FallbackAdapter([build_gemini(), build_nvidia()])
+        # Google's API rejects request deadlines under 10s ("Manually set
+        # deadline 5s is too short"), and attempt_timeout becomes the Gemini
+        # request deadline — the 5s default made every Gemini call 400.
+        return FallbackAdapter([build_gemini(), build_nvidia()], attempt_timeout=10.0)
     if have_nvidia:
         logger.info("LLM: NVIDIA only")
         return build_nvidia()
@@ -438,8 +539,9 @@ def build_routed_llms():
     have_gemini = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
     have_nvidia = bool(os.environ.get("NVIDIA_API_KEY"))
     if have_gemini and have_nvidia:
-        tool_llm = FallbackAdapter([build_nvidia(), build_gemini()])
-        reply_llm = FallbackAdapter([build_gemini(), build_nvidia()])
+        # attempt_timeout=10.0: Gemini requires request deadlines >= 10s (see build_llm)
+        tool_llm = FallbackAdapter([build_nvidia(), build_gemini()], attempt_timeout=10.0)
+        reply_llm = FallbackAdapter([build_gemini(), build_nvidia()], attempt_timeout=10.0)
         return tool_llm, reply_llm
     return None, None
 
@@ -554,9 +656,31 @@ async def entrypoint(ctx: JobContext):
                     audio_ms=round(m.audio_duration * 1000, 2),
                 )
 
+    # Create the agent and wire the on-screen cart: the web UI pushes the current
+    # cart over CART_TOPIC; store it on the agent so `view_cart` can read it.
+    agent = ShopMaxAgent()
+
+    _cart_tasks: set = set()
+
+    def _on_cart(reader, participant_identity):
+        async def _run():
+            try:
+                agent.update_cart(json.loads(await reader.read_all()))
+            except Exception as e:  # pragma: no cover - runtime only
+                logger.debug("cart update skipped: %s", e)
+
+        task = asyncio.create_task(_run())
+        _cart_tasks.add(task)
+        task.add_done_callback(_cart_tasks.discard)
+
+    try:
+        ctx.room.register_text_stream_handler(CART_TOPIC, _on_cart)
+    except Exception as e:  # pragma: no cover - runtime only
+        logger.debug("cart handler registration skipped: %s", e)
+
     # Start the session in the background
     logger.info("Starting AgentSession in background task...")
-    session_task = asyncio.create_task(session.start(room=ctx.room, agent=ShopMaxAgent()))
+    session_task = asyncio.create_task(session.start(room=ctx.room, agent=agent))
 
     # Greet the user after a short delay to allow WebRTC tracks to bind
     logger.info("Waiting 1.5 seconds for WebRTC connection to bind...")

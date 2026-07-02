@@ -6,9 +6,19 @@
     "subcategory": "men",
     "price": 1299,
     "stock": 15,
-    "colors": ["white", "navy blue", "olive green"],
-    "sizes": ["S", "M", "L", "XL"],
-    "description": "Breathable cotton kurta with mandarin collar, perfect for casual and festive wear."
+    "colors": [
+      "white",
+      "navy blue",
+      "olive green"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Breathable cotton kurta with mandarin collar, perfect for casual and festive wear.",
+    "image_url": "https://loremflickr.com/600/600/kurta?lock=1"
   },
   {
     "id": "P002",
@@ -17,9 +27,18 @@
     "subcategory": "women",
     "price": 2499,
     "stock": 8,
-    "colors": ["pink", "yellow", "teal"],
-    "sizes": ["S", "M", "L"],
-    "description": "Elegant floor-length anarkali with floral block print and side zipper closure."
+    "colors": [
+      "pink",
+      "yellow",
+      "teal"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "description": "Elegant floor-length anarkali with floral block print and side zipper closure.",
+    "image_url": "https://loremflickr.com/600/600/dress,indian?lock=2"
   },
   {
     "id": "P003",
@@ -28,9 +47,19 @@
     "subcategory": "men",
     "price": 1899,
     "stock": 22,
-    "colors": ["dark blue", "black", "light wash"],
-    "sizes": ["30", "32", "34", "36"],
-    "description": "Stretchable slim-fit jeans with mid-rise waist and 5-pocket styling."
+    "colors": [
+      "dark blue",
+      "black",
+      "light wash"
+    ],
+    "sizes": [
+      "30",
+      "32",
+      "34",
+      "36"
+    ],
+    "description": "Stretchable slim-fit jeans with mid-rise waist and 5-pocket styling.",
+    "image_url": "https://loremflickr.com/600/600/jeans?lock=3"
   },
   {
     "id": "P004",
@@ -39,9 +68,16 @@
     "subcategory": "accessories",
     "price": 3499,
     "stock": 5,
-    "colors": ["tan", "black", "burgundy"],
-    "sizes": ["one size"],
-    "description": "Genuine leather crossbody bag with adjustable strap and brass hardware."
+    "colors": [
+      "tan",
+      "black",
+      "burgundy"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "Genuine leather crossbody bag with adjustable strap and brass hardware.",
+    "image_url": "https://loremflickr.com/600/600/handbag,leather?lock=4"
   },
   {
     "id": "P005",
@@ -50,9 +86,20 @@
     "subcategory": "footwear",
     "price": 2999,
     "stock": 18,
-    "colors": ["grey/orange", "black/white", "navy/red"],
-    "sizes": ["7", "8", "9", "10", "11"],
-    "description": "Lightweight mesh running shoes with EVA midsole cushioning and rubber outsole."
+    "colors": [
+      "grey/orange",
+      "black/white",
+      "navy/red"
+    ],
+    "sizes": [
+      "7",
+      "8",
+      "9",
+      "10",
+      "11"
+    ],
+    "description": "Lightweight mesh running shoes with EVA midsole cushioning and rubber outsole.",
+    "image_url": "https://loremflickr.com/600/600/sneakers?lock=5"
   },
   {
     "id": "P006",
@@ -61,9 +108,16 @@
     "subcategory": "women",
     "price": 5999,
     "stock": 3,
-    "colors": ["royal blue", "maroon", "emerald green"],
-    "sizes": ["free size"],
-    "description": "Handwoven silk saree with zari border and matching blouse piece included."
+    "colors": [
+      "royal blue",
+      "maroon",
+      "emerald green"
+    ],
+    "sizes": [
+      "free size"
+    ],
+    "description": "Handwoven silk saree with zari border and matching blouse piece included.",
+    "image_url": "https://loremflickr.com/600/600/saree?lock=6"
   },
   {
     "id": "P007",
@@ -72,9 +126,19 @@
     "subcategory": "men",
     "price": 899,
     "stock": 30,
-    "colors": ["beige", "olive", "navy"],
-    "sizes": ["S", "M", "L", "XL"],
-    "description": "Comfortable cotton chino shorts with elasticated waist and side pockets."
+    "colors": [
+      "beige",
+      "olive",
+      "navy"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Comfortable cotton chino shorts with elasticated waist and side pockets.",
+    "image_url": "https://loremflickr.com/600/600/shorts?lock=7"
   },
   {
     "id": "P008",
@@ -83,9 +147,16 @@
     "subcategory": "audio",
     "price": 7999,
     "stock": 12,
-    "colors": ["matte black", "silver", "midnight blue"],
-    "sizes": ["one size"],
-    "description": "Over-ear Bluetooth headphones with active noise cancellation and 30-hour battery life."
+    "colors": [
+      "matte black",
+      "silver",
+      "midnight blue"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "Over-ear Bluetooth headphones with active noise cancellation and 30-hour battery life.",
+    "image_url": "https://loremflickr.com/600/600/headphones?lock=8"
   },
   {
     "id": "P009",
@@ -94,9 +165,16 @@
     "subcategory": "wearables",
     "price": 2499,
     "stock": 25,
-    "colors": ["black", "green", "coral pink"],
-    "sizes": ["one size"],
-    "description": "AMOLED display fitness tracker with heart rate monitor, SpO2 sensor, and 14-day battery."
+    "colors": [
+      "black",
+      "green",
+      "coral pink"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "AMOLED display fitness tracker with heart rate monitor, SpO2 sensor, and 14-day battery.",
+    "image_url": "https://loremflickr.com/600/600/fitness,band?lock=9"
   },
   {
     "id": "P010",
@@ -105,9 +183,16 @@
     "subcategory": "audio",
     "price": 3999,
     "stock": 10,
-    "colors": ["red", "teal", "black"],
-    "sizes": ["one size"],
-    "description": "Waterproof IPX7 portable speaker with 360-degree sound and 12-hour playtime."
+    "colors": [
+      "red",
+      "teal",
+      "black"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "Waterproof IPX7 portable speaker with 360-degree sound and 12-hour playtime.",
+    "image_url": "https://loremflickr.com/600/600/speaker?lock=10"
   },
   {
     "id": "P011",
@@ -116,9 +201,15 @@
     "subcategory": "accessories",
     "price": 1799,
     "stock": 40,
-    "colors": ["white", "black"],
-    "sizes": ["one size"],
-    "description": "GaN 65W fast charger with dual USB-C ports, compatible with laptops and phones."
+    "colors": [
+      "white",
+      "black"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "GaN 65W fast charger with dual USB-C ports, compatible with laptops and phones.",
+    "image_url": "https://loremflickr.com/600/600/charger?lock=11"
   },
   {
     "id": "P012",
@@ -127,9 +218,15 @@
     "subcategory": "audio",
     "price": 4999,
     "stock": 0,
-    "colors": ["white", "black"],
-    "sizes": ["one size"],
-    "description": "True wireless earbuds with hybrid ANC, spatial audio, and wireless charging case."
+    "colors": [
+      "white",
+      "black"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "True wireless earbuds with hybrid ANC, spatial audio, and wireless charging case.",
+    "image_url": "https://loremflickr.com/600/600/earbuds?lock=12"
   },
   {
     "id": "P013",
@@ -138,9 +235,15 @@
     "subcategory": "accessories",
     "price": 1299,
     "stock": 35,
-    "colors": ["black", "blue"],
-    "sizes": ["one size"],
-    "description": "Slim power bank with 22.5W fast charging, LED indicator, and dual output ports."
+    "colors": [
+      "black",
+      "blue"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "Slim power bank with 22.5W fast charging, LED indicator, and dual output ports.",
+    "image_url": "https://loremflickr.com/600/600/powerbank?lock=13"
   },
   {
     "id": "P014",
@@ -149,9 +252,15 @@
     "subcategory": "peripherals",
     "price": 5499,
     "stock": 7,
-    "colors": ["black", "white"],
-    "sizes": ["one size"],
-    "description": "Full-size RGB mechanical keyboard with blue switches, wrist rest, and USB-C connectivity."
+    "colors": [
+      "black",
+      "white"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "Full-size RGB mechanical keyboard with blue switches, wrist rest, and USB-C connectivity.",
+    "image_url": "https://loremflickr.com/600/600/keyboard?lock=14"
   },
   {
     "id": "P015",
@@ -160,9 +269,15 @@
     "subcategory": "wearables",
     "price": 8999,
     "stock": 4,
-    "colors": ["titanium grey", "black"],
-    "sizes": ["one size"],
-    "description": "Premium smartwatch with AMOLED display, GPS, NFC payments, and 5ATM water resistance."
+    "colors": [
+      "titanium grey",
+      "black"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "Premium smartwatch with AMOLED display, GPS, NFC payments, and 5ATM water resistance.",
+    "image_url": "https://loremflickr.com/600/600/smartwatch?lock=15"
   },
   {
     "id": "P016",
@@ -171,9 +286,16 @@
     "subcategory": "bedding",
     "price": 1999,
     "stock": 14,
-    "colors": ["mustard", "grey", "ivory"],
-    "sizes": ["130x170 cm"],
-    "description": "Soft handwoven cotton throw blanket with fringed edges, machine washable."
+    "colors": [
+      "mustard",
+      "grey",
+      "ivory"
+    ],
+    "sizes": [
+      "130x170 cm"
+    ],
+    "description": "Soft handwoven cotton throw blanket with fringed edges, machine washable.",
+    "image_url": "https://loremflickr.com/600/600/blanket?lock=16"
   },
   {
     "id": "P017",
@@ -182,9 +304,15 @@
     "subcategory": "kitchen",
     "price": 3499,
     "stock": 6,
-    "colors": ["white with blue rim", "terracotta"],
-    "sizes": ["16 piece set"],
-    "description": "Microwave-safe ceramic dinner set including 4 plates, 4 bowls, 4 side plates, and 4 mugs."
+    "colors": [
+      "white with blue rim",
+      "terracotta"
+    ],
+    "sizes": [
+      "16 piece set"
+    ],
+    "description": "Microwave-safe ceramic dinner set including 4 plates, 4 bowls, 4 side plates, and 4 mugs.",
+    "image_url": "https://loremflickr.com/600/600/tableware,ceramic?lock=17"
   },
   {
     "id": "P018",
@@ -193,9 +321,14 @@
     "subcategory": "office",
     "price": 999,
     "stock": 20,
-    "colors": ["natural bamboo"],
-    "sizes": ["one size"],
-    "description": "Multi-compartment bamboo organizer for pens, phone, cards, and stationery."
+    "colors": [
+      "natural bamboo"
+    ],
+    "sizes": [
+      "one size"
+    ],
+    "description": "Multi-compartment bamboo organizer for pens, phone, cards, and stationery.",
+    "image_url": "https://loremflickr.com/600/600/desk?lock=18"
   },
   {
     "id": "P019",
@@ -204,9 +337,16 @@
     "subcategory": "decor",
     "price": 799,
     "stock": 28,
-    "colors": ["warm vanilla", "lavender", "ocean breeze"],
-    "sizes": ["3 candle set"],
-    "description": "Hand-poured soy wax candles in glass jars, 25-hour burn time each."
+    "colors": [
+      "warm vanilla",
+      "lavender",
+      "ocean breeze"
+    ],
+    "sizes": [
+      "3 candle set"
+    ],
+    "description": "Hand-poured soy wax candles in glass jars, 25-hour burn time each.",
+    "image_url": "https://loremflickr.com/600/600/candle?lock=19"
   },
   {
     "id": "P020",
@@ -215,9 +355,15 @@
     "subcategory": "bedding",
     "price": 1499,
     "stock": 16,
-    "colors": ["white"],
-    "sizes": ["standard", "king"],
-    "description": "Ergonomic contour memory foam pillow with removable bamboo cover."
+    "colors": [
+      "white"
+    ],
+    "sizes": [
+      "standard",
+      "king"
+    ],
+    "description": "Ergonomic contour memory foam pillow with removable bamboo cover.",
+    "image_url": "https://loremflickr.com/600/600/pillow?lock=20"
   },
   {
     "id": "P021",
@@ -226,9 +372,18 @@
     "subcategory": "kitchen",
     "price": 699,
     "stock": 45,
-    "colors": ["silver", "matte black", "rose gold"],
-    "sizes": ["500ml", "750ml", "1L"],
-    "description": "Double-walled vacuum insulated bottle, keeps drinks cold 24hrs or hot 12hrs."
+    "colors": [
+      "silver",
+      "matte black",
+      "rose gold"
+    ],
+    "sizes": [
+      "500ml",
+      "750ml",
+      "1L"
+    ],
+    "description": "Double-walled vacuum insulated bottle, keeps drinks cold 24hrs or hot 12hrs.",
+    "image_url": "https://loremflickr.com/600/600/bottle?lock=21"
   },
   {
     "id": "P022",
@@ -237,9 +392,16 @@
     "subcategory": "decor",
     "price": 1199,
     "stock": 11,
-    "colors": ["white", "terracotta", "sage green"],
-    "sizes": ["small/medium/large set"],
-    "description": "Matte ceramic plant pots with drainage holes and bamboo saucers."
+    "colors": [
+      "white",
+      "terracotta",
+      "sage green"
+    ],
+    "sizes": [
+      "small/medium/large set"
+    ],
+    "description": "Matte ceramic plant pots with drainage holes and bamboo saucers.",
+    "image_url": "https://loremflickr.com/600/600/plant,pot?lock=22"
   },
   {
     "id": "P023",
@@ -248,9 +410,16 @@
     "subcategory": "decor",
     "price": 1299,
     "stock": 9,
-    "colors": ["indigo", "rust", "olive"],
-    "sizes": ["45x45 cm"],
-    "description": "Hand block-printed cotton cushion covers with zip closure, set of 4."
+    "colors": [
+      "indigo",
+      "rust",
+      "olive"
+    ],
+    "sizes": [
+      "45x45 cm"
+    ],
+    "description": "Hand block-printed cotton cushion covers with zip closure, set of 4.",
+    "image_url": "https://loremflickr.com/600/600/cushion?lock=23"
   },
   {
     "id": "P024",
@@ -259,9 +428,21 @@
     "subcategory": "unisex",
     "price": 799,
     "stock": 50,
-    "colors": ["black", "white", "sage green", "lavender"],
-    "sizes": ["S", "M", "L", "XL", "XXL"],
-    "description": "Drop-shoulder oversized tee in 240 GSM cotton with minimal graphic print."
+    "colors": [
+      "black",
+      "white",
+      "sage green",
+      "lavender"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "description": "Drop-shoulder oversized tee in 240 GSM cotton with minimal graphic print.",
+    "image_url": "https://loremflickr.com/600/600/tshirt?lock=24"
   },
   {
     "id": "P025",
@@ -270,8 +451,15 @@
     "subcategory": "fitness",
     "price": 1799,
     "stock": 13,
-    "colors": ["purple", "teal", "black"],
-    "sizes": ["183x61 cm"],
-    "description": "Non-slip TPE yoga mat with alignment lines, carrying strap included."
+    "colors": [
+      "purple",
+      "teal",
+      "black"
+    ],
+    "sizes": [
+      "183x61 cm"
+    ],
+    "description": "Non-slip TPE yoga mat with alignment lines, carrying strap included.",
+    "image_url": "https://loremflickr.com/600/600/yoga?lock=25"
   }
 ]

@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.git
+.github
+.claude
+__pycache__
+*.pyc
+.pytest_cache
+venv
+frontend
+tests
+bench
+handoff.md
+livekit_voicebot_plan_*.md
+metrics*.jsonl

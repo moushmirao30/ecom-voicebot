@@ -134,9 +134,9 @@ def _product_card(p: dict) -> dict:
 
 
 async def _publish_products(products: list[dict], *, query: str = "") -> None:
-    """Best-effort push of product cards to the frontend over a text stream."""
-    if not products:
-        return
+    """Best-effort push of product cards to the frontend over a text stream.
+    Publishes an empty list too, so the UI can show a proper no-results state
+    instead of silently keeping whatever was shown before."""
     try:
         room = get_job_context().room
     except Exception:
@@ -259,11 +259,11 @@ class ShopMaxAgent(Agent):
         scored.sort(key=lambda sp: sp[0], reverse=True)
         results = [product for _, product in scored[:max_results]]
 
+        # Surface the result (including "nothing found") in the frontend grid (best-effort).
+        await _publish_products(results, query=query)
+
         if not results:
             return json.dumps({"found": 0, "message": f"No products found matching '{query}'."})
-
-        # Surface the matches visually in the frontend product grid (best-effort).
-        await _publish_products(results, query=query)
 
         simplified = []
         for p in results:

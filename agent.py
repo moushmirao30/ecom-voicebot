@@ -60,12 +60,33 @@ def _rupees_to_words(amount) -> str:
 
 
 def _name_matches(provided: str, stored: str) -> bool:
-    """Lightweight identity check for order lookups: accept if the caller shares
-    any name token (first or last name) with the name on the order, case-
-    insensitive. This is a demo-grade privacy gate, not strong authentication."""
+    """Stricter identity check for order lookups to prevent leaks.
+    Accepts if the provided tokens are a subset of stored tokens (e.g., 'Priya' or
+    'Sharma' matches 'Priya Sharma') or vice versa. Blocks contradictory inputs
+    (e.g., 'Priya Patel' trying to access 'Priya Sharma')."""
     provided_tokens = {t for t in (provided or "").lower().split() if t}
     stored_tokens = {t for t in (stored or "").lower().split() if t}
-    return bool(provided_tokens & stored_tokens)
+    if not provided_tokens or not stored_tokens:
+        return False
+    return provided_tokens.issubset(stored_tokens) or stored_tokens.issubset(provided_tokens)
+
+
+def _pronounce_order_id(order_id: str) -> str:
+    """Helper to convert ORD1001 -> 'O R D one zero zero one' for clear TTS spelling."""
+    if not order_id:
+        return ""
+    result = []
+    for char in order_id:
+        if char.isalpha():
+            result.append(char.upper())
+        elif char.isdigit():
+            try:
+                result.append(num2words(int(char), lang="en_IN"))
+            except Exception:
+                result.append(char)
+        else:
+            result.append(char)
+    return " ".join(result)
 
 
 # Fuzzy product retrieval. Matching on name+subcategory+colors only (NOT the
@@ -77,7 +98,9 @@ PRODUCT_MATCH_THRESHOLD = 68
 _SEARCH_STOPWORDS = {
     "a", "an", "the", "any", "some", "do", "you", "have", "in", "stock", "for",
     "me", "i", "want", "need", "looking", "show", "of", "with", "please", "is",
-    "are", "there", "my", "to", "find", "get",
+    "are", "there", "my", "to", "find", "get", "buy", "purchase", "sale", "cheap",
+    "expensive", "premium", "deluxe", "quality", "original", "best", "latest",
+    "summer", "winter", "trendy", "cool", "nice", "good",
 }
 
 
@@ -172,7 +195,9 @@ class ShopMaxAgent(Agent):
                 "You help users search for products, check prices, stock availability, track orders, and answer policy questions.\n\n"
                 "# Rules\n"
                 "- ALWAYS use the provided tools to look up product, order, or policy information. NEVER guess or make up product details, prices, stock levels, order statuses, or store policies (like shipping fees, return window, etc.).\n"
+                "- Before calling a tool to look up information, say a very brief transition phrase (e.g., 'Let me check that...', 'Sure, looking up your order...', 'Let me search our catalog...'). This keeps the conversation natural during the processing pause.\n"
                 "- ORDER PRIVACY: Order details are private. Before looking up an order, you MUST first ask for the full name the order was placed under, then pass it to `order_status_lookup` as `customer_name`. If the result is not verified, politely ask the customer to confirm the exact name on the order and do NOT reveal any order status, items, or delivery information.\n"
+                "- When speaking an order ID or tracking number, read the characters and digits separately as provided in `order_id_spoken` or `tracking_number_spoken` (e.g., 'O R D one zero zero one'). Never pronounce it as a single word or a long number.\n"
                 "- If a tool returns no results, politely apologize and explain that you couldn't find a match, then thank them and ask them to try different keywords or rephrase. Use phrases like 'I am so sorry' or 'I apologize'.\n"
                 "- Refer to products by their EXACT names from the tool results. Never relabel a product as the thing the user asked for if the names differ (e.g. if they ask for 'gaming laptops' and the tool returns a keyboard, do NOT call it a laptop). If nothing genuinely matches, say so.\n"
                 "- All prices are in Indian Rupees. The tools give you a ready-to-speak form of every amount (the `price_spoken` / `total_spoken` fields). When saying a price out loud, READ THAT SPOKEN FORM VERBATIM; never convert digits to words yourself and never read out the ₹ symbol.\n"
@@ -190,7 +215,7 @@ class ShopMaxAgent(Agent):
                 "5. **Cart**: The shopper can add products to an on-screen cart. When they ask what's in their cart or their running total, call `view_cart`.\n\n"
                 "# Conversation style\n"
                 "- Greet warmly. Be helpful and conversational.\n"
-                "- Summarize results clearly. If multiple products match, mention the top 3-4 and ask if the user wants details on any specific one.\n"
+                "- Summarize search results concisely. If multiple products match, only mention the top 2 matching options by voice, note that other matching options are shown on the screen, and ask if the user wants details on either of those.\n"
             )
         )
         # Latest on-screen cart state, pushed from the web UI over CART_TOPIC.
@@ -372,6 +397,7 @@ class ShopMaxAgent(Agent):
             "found": True,
             "verified": True,
             "order_id": order["order_id"],
+            "order_id_spoken": _pronounce_order_id(order["order_id"]),
             "status": order["status"],
             "items": [item["name"] for item in order["items"]],
             "total_inr": order["total"],
@@ -386,6 +412,7 @@ class ShopMaxAgent(Agent):
         elif order["status"] == "shipped":
             result["estimated_delivery"] = order.get("estimated_delivery")
             result["tracking_number"] = order.get("tracking_number")
+            result["tracking_number_spoken"] = _pronounce_order_id(order.get("tracking_number"))
         elif order["status"] == "processing":
             result["estimated_delivery"] = order.get("estimated_delivery")
         elif order["status"] == "cancelled":
@@ -590,6 +617,11 @@ async def entrypoint(ctx: JobContext):
     # Configure STT, LLM, TTS, and Turn Detector
     session = AgentSession(
         stt=deepgram.STT(model="nova-3"),
+        vad=inference.VAD(
+            model="silero",
+            min_speech_duration=0.15,      # Filter brief noises / clearing throat
+            min_silence_duration=0.45,     # Give user breathing space to pause/think
+        ),
         llm=build_llm(),
         tts=cartesia.TTS(voice="f786b574-daa5-4673-aa0c-cbe3e8534c02"),
         turn_detection=inference.TurnDetector(),

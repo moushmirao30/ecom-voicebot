@@ -38,3 +38,11 @@ def test_split_word_stt_artifact_matches():
     # "head phones" (STT split) -> "headphones".
     hp = _named("Wireless Noise-Cancelling Headphones")
     assert _product_match_score("head phones", hp) >= PRODUCT_MATCH_THRESHOLD
+
+
+def test_search_adjectives_are_filtered():
+    # Adjectives like "cheap", "best", "premium" should be filtered out.
+    kurta = _named("Classic Cotton Kurta")
+    assert _product_match_score("cheap cotton kurta", kurta) >= PRODUCT_MATCH_THRESHOLD
+    assert _product_match_score("best premium cotton kurta", kurta) >= PRODUCT_MATCH_THRESHOLD
+

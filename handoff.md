@@ -85,7 +85,7 @@ E-Com VoiceBot/
     └── package.json         # pnpm-managed; aura visualizer + branding customizations
 ```
 
-> **Two front-end copies, like the backend.** The redesign is authored on Windows and run from WSL (`~/projects/voicebot/frontend`, where `pnpm` lives — Windows has no pnpm). Keep them in sync. `pnpm dev` does **not** lint; run `pnpm build` before deploy to catch lint/format issues.
+> **Two front-end copies, like the backend.** The redesign is authored on Windows and run from WSL (`~/projects/voicebot/frontend`, where `pnpm` lives — Windows has no pnpm). Keep them in sync — the WSL copy now has a **`winlocal` git remote** pointing at the Windows repo (`git fetch winlocal && git merge winlocal/<branch>` syncs without GitHub; a pre-sync WSL working tree is stashed as "pre-sync WSL working tree"). `pnpm dev` does **not** lint; run `pnpm build` before deploy to catch lint/format issues.
 
 **Key code anchors in `agent.py`:**
 - `ShopMaxAgent` (instructions + grounding rules) — [agent.py](agent.py)

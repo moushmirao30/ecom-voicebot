@@ -518,7 +518,10 @@ def build_llm():
     have_nvidia = bool(os.environ.get("NVIDIA_API_KEY"))
     if have_gemini and have_nvidia:
         logger.info("LLM: FallbackAdapter [Gemini primary -> NVIDIA fallback]")
-        return FallbackAdapter([build_gemini(), build_nvidia()])
+        # Google's API rejects request deadlines under 10s ("Manually set
+        # deadline 5s is too short"), and attempt_timeout becomes the Gemini
+        # request deadline — the 5s default made every Gemini call 400.
+        return FallbackAdapter([build_gemini(), build_nvidia()], attempt_timeout=10.0)
     if have_nvidia:
         logger.info("LLM: NVIDIA only")
         return build_nvidia()
@@ -536,8 +539,9 @@ def build_routed_llms():
     have_gemini = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
     have_nvidia = bool(os.environ.get("NVIDIA_API_KEY"))
     if have_gemini and have_nvidia:
-        tool_llm = FallbackAdapter([build_nvidia(), build_gemini()])
-        reply_llm = FallbackAdapter([build_gemini(), build_nvidia()])
+        # attempt_timeout=10.0: Gemini requires request deadlines >= 10s (see build_llm)
+        tool_llm = FallbackAdapter([build_nvidia(), build_gemini()], attempt_timeout=10.0)
+        reply_llm = FallbackAdapter([build_gemini(), build_nvidia()], attempt_timeout=10.0)
         return tool_llm, reply_llm
     return None, None
 

@@ -15,7 +15,7 @@ This document serves as the single source of truth for the LiveKit E-Commerce Vo
 | **Phase 3.5** | Design System & Product Surface | "Suggested Direction" palette/typography, animated hero, live product grid + cart | Post-Phase-3 | 🟢 **COMPLETE** |
 | **Phase 4** | Deploy & Package | Cloud deployment, Demo video, Case study | Days 9–13 | 🟡 **IN PROGRESS** |
 
-> **▶ Next up (Phase 4):** (1) a **live end-to-end run** — agent + frontend together: "show me headphones" → grid; add to cart → "what's my total?"; "track order ORD1002" → order card; a failed search → no-results state. This exercises every stream in one session and is the first of the "10 full-flow runs". Then (2) deploy to LiveKit Cloud, (3) record the 60–90s demo video, (4) draft the root README/case study.
+> **▶ Next up (Phase 4):** ~~(1) live end-to-end run~~ ✅ **Done 2026-07-02** — all four flows passed in one session (products grid → add-to-cart → spoken cart total → verified order card → no-results state), driven via the chat input (same agent pipeline minus STT). **It caught and fixed a real bug:** Google's API began rejecting request deadlines under 10s, so `FallbackAdapter`'s default `attempt_timeout=5.0` made **every** Gemini call fail with 400 `INVALID_ARGUMENT` and silently fall back to NVIDIA. Fixed by passing `attempt_timeout=10.0` to all three adapters in `agent.py`; re-verified live — Gemini now serves with zero fallback switches. Remaining: (2) deploy to LiveKit Cloud, (3) record the 60–90s demo video, (4) draft the root README/case study, plus the other 9 full-flow runs (ideally voice-driven, against the deployed stack).
 
 ---
 

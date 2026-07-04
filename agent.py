@@ -544,11 +544,23 @@ def build_llm():
     have_gemini = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
     have_nvidia = bool(os.environ.get("NVIDIA_API_KEY"))
     if have_gemini and have_nvidia:
-        logger.info("LLM: FallbackAdapter [Gemini primary -> NVIDIA fallback]")
-        # Google's API rejects request deadlines under 10s ("Manually set
-        # deadline 5s is too short"), and attempt_timeout becomes the Gemini
-        # request deadline — the 5s default made every Gemini call 400.
-        return FallbackAdapter([build_gemini(), build_nvidia()], attempt_timeout=10.0)
+        # attempt_timeout=10.0: Google's API rejects request deadlines under 10s
+        # ("Manually set deadline 5s is too short"), and attempt_timeout becomes
+        # the Gemini request deadline — the 5s default made every Gemini call 400.
+        #
+        # LLM_PRIMARY selects which provider is tried first. Default NVIDIA: the
+        # Gemini free tier is only 20 requests/day, so in live use it is usually
+        # quota-exhausted (429). With Gemini primary, every turn then wastes a
+        # full round-trip on the dead primary before failing over — adding
+        # seconds of latency per turn. NVIDIA-primary (~481ms TTFT) avoids that.
+        # Set LLM_PRIMARY=gemini to prefer Gemini's quality when it has quota.
+        if _llm_primary() == "gemini":
+            logger.info("LLM: FallbackAdapter [Gemini primary -> NVIDIA fallback]")
+            order = [build_gemini(), build_nvidia()]
+        else:
+            logger.info("LLM: FallbackAdapter [NVIDIA primary -> Gemini fallback]")
+            order = [build_nvidia(), build_gemini()]
+        return FallbackAdapter(order, attempt_timeout=10.0)
     if have_nvidia:
         logger.info("LLM: NVIDIA only")
         return build_nvidia()
@@ -556,19 +568,31 @@ def build_llm():
     return build_gemini()
 
 
+def _llm_primary() -> str:
+    """Which provider to try first: 'nvidia' (default, quota-free/reliable) or
+    'gemini' (higher quality, but only 20 free requests/day). See build_llm."""
+    return os.environ.get("LLM_PRIMARY", "nvidia").strip().lower()
+
+
 def build_routed_llms():
     """(#6) Returns (tool_llm, reply_llm) for per-step routing, or (None, None) if
     routing isn't possible (only one provider configured).
 
-    - tool-decision step  -> NVIDIA primary (fast/cheap), Gemini fallback
-    - user-facing reply    -> Gemini primary (quality), NVIDIA fallback
+    - tool-decision step -> always NVIDIA primary (fast/cheap), Gemini fallback.
+    - user-facing reply   -> NVIDIA primary by default; Gemini primary (quality)
+      only when LLM_PRIMARY=gemini. Defaulting the reply step to Gemini while its
+      free quota is exhausted made every reply turn wait out the dead primary
+      before failing over — the main source of multi-second turn latency.
     """
     have_gemini = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
     have_nvidia = bool(os.environ.get("NVIDIA_API_KEY"))
     if have_gemini and have_nvidia:
         # attempt_timeout=10.0: Gemini requires request deadlines >= 10s (see build_llm)
         tool_llm = FallbackAdapter([build_nvidia(), build_gemini()], attempt_timeout=10.0)
-        reply_llm = FallbackAdapter([build_gemini(), build_nvidia()], attempt_timeout=10.0)
+        if _llm_primary() == "gemini":
+            reply_llm = FallbackAdapter([build_gemini(), build_nvidia()], attempt_timeout=10.0)
+        else:
+            reply_llm = FallbackAdapter([build_nvidia(), build_gemini()], attempt_timeout=10.0)
         return tool_llm, reply_llm
     return None, None
 

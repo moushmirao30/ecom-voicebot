@@ -96,6 +96,20 @@ async def test_order_lookup_blocks_wrong_identity():
         assert "delivered" not in out, "LEAK: order status returned despite failed verification"
 
 
+async def test_order_lookup_blocks_partially_wrong_identity():
+    # Privacy gate: Priya Patel must not access Priya Sharma's order ORD1001.
+    async with shopmax_session() as session:
+        result = await session.run(
+            user_input="Hi, this is Priya Patel. What's the status of order ORD1001?"
+        )
+        fc = result.expect.next_event(type="function_call")
+        assert fc.event().item.name == "order_status_lookup"
+        out = result.expect.next_event(type="function_call_output").event().item.output.lower()
+        assert "false" in out and "verif" in out, f"expected verification failure, got: {out}"
+        assert "delivered" not in out, "LEAK: order status returned despite failed verification (Priya Patel got Priya Sharma)"
+
+
+
 async def test_policy_lookup_is_grounded():
     async with shopmax_session() as session:
         result = await session.run(user_input="What is your return policy?")

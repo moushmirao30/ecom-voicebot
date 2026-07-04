@@ -15,7 +15,7 @@ This document serves as the single source of truth for the LiveKit E-Commerce Vo
 | **Phase 3.5** | Design System & Product Surface | "Suggested Direction" palette/typography, animated hero, live product grid + cart | Post-Phase-3 | 🟢 **COMPLETE** |
 | **Phase 4** | Deploy & Package | Cloud deployment, Demo video, Case study | Days 9–13 | 🟡 **IN PROGRESS** |
 
-> **▶ Next up (Phase 4):** ~~(1) live end-to-end run~~ ✅ **Done 2026-07-02** — all four flows passed in one session (products grid → add-to-cart → spoken cart total → verified order card → no-results state), driven via the chat input (same agent pipeline minus STT). **It caught and fixed a real bug:** Google's API began rejecting request deadlines under 10s, so `FallbackAdapter`'s default `attempt_timeout=5.0` made **every** Gemini call fail with 400 `INVALID_ARGUMENT` and silently fall back to NVIDIA. Fixed by passing `attempt_timeout=10.0` to all three adapters in `agent.py`; re-verified live — Gemini now serves with zero fallback switches. ~~(2) deploy to LiveKit Cloud~~ ✅ **Done 2026-07-02** — agent `CA_52WcohugKh5g` deployed via `lk agent create` (remote Docker build, region `ap-south`, 2 CPU / 4GB, secrets uploaded minus LIVEKIT_* which the platform injects). `Dockerfile`, `.dockerignore`, and `livekit.toml` are committed. Verified live: with **no local agent running**, connecting the frontend dispatched the cloud agent — greeting, `product_search`, and the product panel all worked. `lk` CLI (v2.16.7) lives at `~/bin/lk` in WSL, project auth saved as `ecom-voicebot`. Remaining: (3) **host the frontend** — needs a Vercel/Netlify login (interactive; run `npx vercel` in `frontend/`, set `LIVEKIT_URL`/`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` as env vars); local `pnpm dev` remains fine for demos. (4) record the 60–90s demo video, (5) draft the root README/case study, plus the other 9 full-flow runs (ideally voice-driven, against the deployed stack).
+> **▶ Next up (Phase 4):** ~~(1) live end-to-end run~~ ✅ **Done 2026-07-02** — all four flows passed in one session (products grid → add-to-cart → spoken cart total → verified order card → no-results state), driven via the chat input (same agent pipeline minus STT). **It caught and fixed a real bug:** Google's API began rejecting request deadlines under 10s, so `FallbackAdapter`'s default `attempt_timeout=5.0` made **every** Gemini call fail with 400 `INVALID_ARGUMENT` and silently fall back to NVIDIA. Fixed by passing `attempt_timeout=10.0` to all three adapters in `agent.py`; re-verified live — Gemini now serves with zero fallback switches. ~~(2) deploy to LiveKit Cloud~~ ✅ **Done 2026-07-02** — agent `CA_52WcohugKh5g` deployed via `lk agent create` (remote Docker build, region `ap-south`, 2 CPU / 4GB, secrets uploaded minus LIVEKIT_* which the platform injects). `Dockerfile`, `.dockerignore`, and `livekit.toml` are committed. Verified live: with **no local agent running**, connecting the frontend dispatched the cloud agent — greeting, `product_search`, and the product panel all worked. `lk` CLI (v2.16.7) lives at `~/bin/lk` in WSL, project auth saved as `ecom-voicebot`. ~~(3) host the frontend~~ ✅ **Done 2026-07-02** — frontend deployed to **Vercel** at **https://ecom-voicebot-frontend.vercel.app/**. Key fix: the upstream LiveKit starter's `/api/token` route had a hard `NODE_ENV !== 'development'` guard that threw a 500 on every production request — removed and replaced with a TODO comment for adding real auth. `feat/ui-suggested-direction` merged into `main` on the frontend repo. **Vercel env vars** (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`) must be set in the Vercel dashboard → Settings → Environment Variables for the token endpoint to work. ~~(4) implement quality tuning~~ ✅ **Done 2026-07-02** — tuned Silero VAD parameters (`min_speech_duration=0.15s` to filter noise, `min_silence_duration=0.45s` to give user pauses), added strict subset verification matching to block leaks (e.g. "Priya Patel" blocked for "Priya Sharma"), character-by-character spelling spelling of order IDs and tracking numbers, and expanded search stopwords (cheap, best, etc.). Prompt modified to enforce spoken lists of max 2 items and brief transitions before tool calls. Remaining: (5) record the 60–90s demo video, (6) draft the root README/case study, (7) **deploy `agent.py` to a cloud host** so the bot responds without a local process (see **Agent Cloud Hosting** below), plus the other 9 full-flow runs (ideally voice-driven, against the deployed stack).
 
 ---
 
@@ -85,7 +85,7 @@ E-Com VoiceBot/
     └── package.json         # pnpm-managed; aura visualizer + branding customizations
 ```
 
-> **Two front-end copies, like the backend.** The redesign is authored on Windows and run from WSL (`~/projects/voicebot/frontend`, where `pnpm` lives — Windows has no pnpm). Keep them in sync. `pnpm dev` does **not** lint; run `pnpm build` before deploy to catch lint/format issues.
+> **Two front-end copies, like the backend.** The redesign is authored on Windows and run from WSL (`~/projects/voicebot/frontend`, where `pnpm` lives — Windows has no pnpm). Keep them in sync — the WSL copy now has a **`winlocal` git remote** pointing at the Windows repo (`git fetch winlocal && git merge winlocal/<branch>` syncs without GitHub; a pre-sync WSL working tree is stashed as "pre-sync WSL working tree"). `pnpm dev` does **not** lint; run `pnpm build` before deploy to catch lint/format issues.
 
 **Key code anchors in `agent.py`:**
 - `ShopMaxAgent` (instructions + grounding rules) — [agent.py](agent.py)
@@ -288,8 +288,10 @@ pytest                                                    # ~17s, hits NVIDIA
   - [x] Fix transcript auto-scroll "chat freeze" bug.
 
 ### Phase 4: Deploy & Package (Days 9–13)
-* [ ] **Deployment (Day 9 - ~5 hr):**
-  - [ ] Deploy voice agent to LiveKit Cloud.
+* [x] **Deployment (Day 9 - ~5 hr):**
+  - [x] Deploy voice agent to LiveKit Cloud.
+  - [x] Deploy frontend to Vercel (token route production fix, branch merged to `main`).
+  - [ ] Deploy `agent.py` to a persistent cloud host (Railway/Render/VPS) — see **Agent Cloud Hosting** below.
   - [ ] Perform 10x full-flow runs and fix UX friction points.
 * [ ] **Branded Showcase & Demo (Days 10–11 - ~10 hr):**
   - [ ] Construct a mock storefront layout.
@@ -307,21 +309,45 @@ A round of robustness/quality improvements with tests. Status:
 |---|---|---|---|
 | 1 | **Grounding eval suite** | ✅ Done | `tests/test_grounding_evals.py` — deterministic tool/grounding checks + LLM judges. Caught a real hallucination bug (see #5). |
 | 2 | **LLM failover** (Gemini primary → NVIDIA fallback) | ✅ Done | `build_llm()` uses `FallbackAdapter`; `tests/test_llm_fallback.py` proves a turn survives primary failure. |
-| 3 | **Identity-gated order lookups** | ✅ Done | `order_status_lookup` now requires `customer_name` and verifies it (`_name_matches`) before revealing details. Wrong name → blocked, no leak (`test_order_lookup_blocks_wrong_identity`). Demo-grade gate, not strong auth. |
-| 4 | **Deterministic ₹/number formatting** | ✅ Done | Tools return a `price_spoken`/`total_spoken` form (`num2words` en_IN); prompt no longer asks the LLM to convert digits. Unit-tested in `test_formatting.py`. |
-| 5 | **Robust retrieval** (fuzzy product search) | ✅ Done | `rapidfuzz` min-token coverage over name+subcategory+colors (threshold 68), with split-word rescue. Absent products now return nothing — **fixed the hallucination bug from #1** (its eval is now a normal pass). Unit-tested in `test_retrieval.py`. |
-| 6 | **Per-step LLM routing** (NVIDIA tools / Gemini reply) | ✅ Done | `ShopMaxAgent.llm_node` routes tool-decision turns → NVIDIA, post-tool reply → Gemini (`_select_route`), each with the other as fallback. Toggle via `route_llms`. Tested in `test_llm_routing.py`. *Note: while Gemini's quota is exhausted the reply step transparently falls back to NVIDIA, so the quality benefit only shows once Gemini has quota.* |
+| 3 | **Identity-gated order lookups** | ✅ Done | `order_status_lookup` now requires `customer_name` and verifies it strictly using a subset matching gate (`_name_matches`) before revealing details. Wrong name (or partial matching name with contradictory tokens like 'Priya Patel') → blocked, no leak (`test_order_lookup_blocks_wrong_identity`, `test_order_lookup_blocks_partially_wrong_identity`). |
+| 4 | **Deterministic ₹/number formatting** | ✅ Done | Tools return a `price_spoken`/`total_spoken` form (`num2words` en_IN); prompt no longer asks the LLM to convert digits. Also added character-by-character spelling spelling (`order_id_spoken`, `tracking_number_spoken`) for clean TTS pronunciation. |
+| 5 | **Robust retrieval** (fuzzy product search) | ✅ Done | `rapidfuzz` min-token coverage over name+subcategory+colors (threshold 68), with split-word rescue. Expanded search stopwords list (`cheap`, `best`, `latest`, `premium`, etc.) to filter qualitative retail descriptors. Absent products score below threshold and return nothing (`test_retrieval.py`). |
+| 6 | **Per-step LLM routing** (NVIDIA tools / configurable reply) | ✅ Done | `ShopMaxAgent.llm_node` routes tool-decision turns → NVIDIA, post-tool reply → `LLM_PRIMARY` provider (`_select_route`), each with the other as fallback. Toggle via `route_llms`. Tested in `test_llm_routing.py`. **`LLM_PRIMARY` env var (default `nvidia`)** picks the reply-step primary. ⚠️ **Latency bug found & fixed on the cloud deploy (2026-07-04):** the reply step defaulted to **Gemini primary**, but the Gemini free tier is 20 req/day and is normally quota-exhausted (429). So every reply turn wasted a full round-trip on the dead primary (worsened by `attempt_timeout=10.0`) before failing over → **E2E turns of 5.7–22.6s**. Defaulting `LLM_PRIMARY=nvidia` removed the wasted hop: **verified live at 1.8–2.2s E2E, 0×429, 0×switches**. Set `LLM_PRIMARY=gemini` to prefer Gemini quality on days it has quota. |
 | 7 | **Structured metrics export** | ✅ Done | `_MetricsRecorder` writes one JSON object per metric event to `METRICS_JSONL` (kinds: `turn`/`llm`/`tts`), alongside the human logs. Verified live (16 records). Unit-tested in `test_metrics.py`. OTel suggested for production. |
 | 8 | **Secrets / CI hygiene** | ✅ Done | `.env`/secrets and `frontend/` (separate starter) gitignored — **verified via `git ls-files`: only `.env.example` is tracked, no real keys were ever committed** (earlier "rotate — shared in chat" note was over-cautious). `.github/workflows/ci.yml`: fast unit job (`-m "not llm"`, no keys) on every push + gated nightly LLM-eval job. LLM evals auto-retry (`pytest-rerunfailures`) to absorb model nondeterminism. |
 | 9 | **Product surface pipeline** | ✅ Done | Agent → frontend product grid over a text stream (see Phase 3.5). `_publish_products()` is best-effort (no-ops without a room), so grounding evals are unaffected. Verified live (panel + cart interactive test). |
 
-**Test suite: 31 passed** (19 network-free unit + 12 live-LLM evals). Run: `pytest` (all) or `pytest -m "not llm"` (fast, no keys). *(+3 from `tests/test_cart.py` for the voice-aware cart.)*
+**Test suite: 33 passed** (21 network-free unit + 12 live-LLM evals). Run: `pytest` (all) or `pytest -m "not llm"` (fast, no keys). *(+3 from `tests/test_cart.py` for the voice-aware cart.)*
 
 > **GitHub (both repos private, CI green):**
 > - **Backend** `moushmirao30/ecom-voicebot` — `main` (baseline + hardening) and `feat/ui-suggested-direction` (all Phase-3.5 work: streams, cart tool, catalog images, this doc), both pushed. One CI fix landed post-first-push: `test_build_routed_llms_returns_distinct_pair` assumed both provider keys existed (true only with a local `.env`) — made key-independent via `monkeypatch` so the keyless unit job passes.
-> - **Frontend** `moushmirao30/ecom-voicebot-frontend` — `main` (starter base) and `feat/ui-suggested-direction` (design system, hero, product panel, persona badge), both pushed. Local `origin` still points at upstream `livekit-examples/agent-starter-react`; push via the `myfork` remote.
-> - Neither feature branch is merged to `main` yet — open PRs when ready:
->   `github.com/moushmirao30/ecom-voicebot/pull/new/feat/ui-suggested-direction` · `github.com/moushmirao30/ecom-voicebot-frontend/pull/new/feat/ui-suggested-direction`
+> - **Frontend** `moushmirao30/ecom-voicebot-frontend` — `feat/ui-suggested-direction` **merged into `main`** (2026-07-02). Deployed to **Vercel** at `https://ecom-voicebot-frontend.vercel.app/`. Token route production fix included in the merge. Local `origin` still points at upstream `livekit-examples/agent-starter-react`; push via the `myfork` remote.
+> - **Backend** feature branch not yet merged to `main` — open PR when ready:
+>   `github.com/moushmirao30/ecom-voicebot/pull/new/feat/ui-suggested-direction`
+
+---
+
+## ☁️ Agent Cloud Hosting
+
+The frontend (Vercel) and agent (`agent.py`) **never talk directly** — both connect independently to **LiveKit Cloud**, which bridges them in real-time. The agent must be a **long-running process** (not serverless).
+
+| Component | Deployed to | Connects to |
+|---|---|---|
+| Frontend (Next.js) | Vercel (`ecom-voicebot-frontend.vercel.app`) | LiveKit Cloud (generates JWT via `/api/token`) |
+| Agent (`agent.py`) | Needs a persistent host (see below) | LiveKit Cloud (WebSocket, auto-joins rooms) |
+
+**Recommended options (easiest first):**
+
+1. **Railway** (recommended) — connect GitHub repo, auto-detects `Dockerfile`, add env vars, deploy. Free tier ($5/mo). Container runs 24/7.
+2. **Render** — similar to Railway; use a **Background Worker** (not Web Service — the agent doesn't serve HTTP).
+3. **Google Cloud Run** — `gcloud run deploy` with `--min-instances 1` (always-on). More complex setup.
+4. **Any VPS** (DigitalOcean/EC2) — `docker build -t ecom-voicebot . && docker run -d --restart unless-stopped --env-file .env ecom-voicebot`.
+
+**Required env vars on the host (same as `.env`):** `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `DEEPGRAM_API_KEY`, `CARTESIA_API_KEY`, `GEMINI_API_KEY` (and optionally `NVIDIA_API_KEY` / `NVIDIA_LLM_MODEL`).
+
+The existing `Dockerfile` is production-ready — it installs deps, caches Silero VAD weights, and runs `python agent.py start`.
+
+> **LiveKit Cloud agent (`lk agent create`)** is an alternative if you have `lk` CLI access — the agent is already deployed as `CA_52WcohugKh5g` (region `ap-south`). See Phase 4 notes above.
 
 ---
 

@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from dotenv import load_dotenv
@@ -69,6 +70,51 @@ def _name_matches(provided: str, stored: str) -> bool:
     if not provided_tokens or not stored_tokens:
         return False
     return provided_tokens.issubset(stored_tokens) or stored_tokens.issubset(provided_tokens)
+
+
+def _normalize_order_id(raw: str) -> str:
+    """Normalize a possibly-dictated order id for matching.
+
+    A spoken 'ORD1002' reaches us from STT in many shapes — 'ORD 1002',
+    'O R D 1002', 'order 1002', 'ord-1002', 'O.R.D. 1002' — none of which
+    exact-match the catalog's 'ORD1002'. Strip everything but alphanumerics,
+    uppercase, and fold a leading 'ORDER' to the catalog's 'ORD' prefix so all
+    those variants collapse to the same key.
+    """
+    s = re.sub(r"[^A-Za-z0-9]", "", raw or "").upper()
+    if s.startswith("ORDER"):
+        s = "ORD" + s[len("ORDER"):]
+    return s
+
+
+def _order_digits(raw: str) -> str:
+    """Digits only, for the fallback where STT drops/garbles the 'ORD' prefix
+    and the caller effectively gives just the number (e.g. 'order 1002' -> 1002,
+    or a bare '1002')."""
+    return re.sub(r"\D", "", raw or "")
+
+
+def _find_order(orders, order_id: str):
+    """Match a dictated/typed order id against the catalog, tolerant of STT
+    formatting. Returns the order dict or None.
+
+    1. Normalized exact match (handles spaces/dots/hyphens and ORDER->ORD).
+    2. Digit-suffix fallback: if the id still doesn't match but carries >=3
+       digits that uniquely identify one order, use that. The uniqueness guard
+       avoids a wrong-order match.
+    """
+    query_norm = _normalize_order_id(order_id)
+    if query_norm:
+        for o in orders:
+            if _normalize_order_id(o["order_id"]) == query_norm:
+                return o
+
+    query_digits = _order_digits(order_id)
+    if len(query_digits) >= 3:
+        matches = [o for o in orders if _order_digits(o["order_id"]) == query_digits]
+        if len(matches) == 1:
+            return matches[0]
+    return None
 
 
 def _pronounce_order_id(order_id: str) -> str:
@@ -366,13 +412,10 @@ class ShopMaxAgent(Agent):
                 the caller's identity before revealing any order details. Always
                 collect this from the user before calling this tool.
         """
-        order_id_upper = order_id.upper()
-        order = None
-
-        for o in ORDERS:
-            if o["order_id"].upper() == order_id_upper:
-                order = o
-                break
+        # STT renders a dictated order id many ways ('ORD 1002', 'O R D 1002',
+        # 'order 1002'); _find_order normalizes before matching (was an exact
+        # string compare that failed on every spoken id).
+        order = _find_order(ORDERS, order_id)
 
         if not order:
             return json.dumps({

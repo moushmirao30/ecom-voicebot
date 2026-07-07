@@ -48,6 +48,9 @@ CATALOG: list[dict] = _load_json("catalog.json")
 ORDERS: list[dict] = _load_json("orders.json")
 POLICIES: list[dict] = _load_json("policies.json")
 
+# Real category values, for sanitizing the LLM-provided search filter.
+_CATALOG_CATEGORIES = {p["category"].strip().lower() for p in CATALOG}
+
 
 def _rupees_to_words(amount) -> str:
     """Deterministic ₹ amount -> spoken Indian-English form, so the LLM never has
@@ -317,10 +320,20 @@ class ShopMaxAgent(Agent):
             category: Optional category filter. One of: 'fashion', 'electronics', 'home'. Leave empty to search all.
             max_results: Maximum number of results to return. Default is 5.
         """
+        # Sanitize the category filter. The tool schema says one of
+        # fashion/electronics/home, but the LLM routinely invents others
+        # ("footwear", "sports") or passes the literal string "null" — and a
+        # wrong filter must not hide real matches (it was zeroing out searches
+        # like "running shoes"). Ignore anything that isn't a real catalog
+        # category and let fuzzy scoring decide.
+        cat = (category or "").strip().lower()
+        if cat not in _CATALOG_CATEGORIES:
+            cat = None
+
         scored = []
         for product in CATALOG:
             # Category filter
-            if category and product["category"].lower() != category.lower():
+            if cat and product["category"].lower() != cat:
                 continue
             score = _product_match_score(query, product)
             if score >= PRODUCT_MATCH_THRESHOLD:

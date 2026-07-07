@@ -21,6 +21,7 @@ from livekit.agents import (
 from num2words import num2words
 from rapidfuzz import fuzz
 from livekit.agents.llm import FallbackAdapter
+from livekit.agents.tts import FallbackAdapter as TTSFallbackAdapter
 from livekit.plugins import deepgram, cartesia, google, openai
 
 # Load environment variables
@@ -589,6 +590,25 @@ def build_nvidia(temperature: float = 0.4) -> openai.LLM:
     )
 
 
+def build_tts():
+    """TTS with automatic failover, mirroring the LLM design (#2).
+
+    Cartesia Sonic is primary for its voice quality, but its free-tier credits
+    are finite — when they run out the TTS websocket handshake fails with 402
+    quota_exceeded, the greeting can never be spoken, and the session dies with
+    "Agent joined the room but did not complete initializing" (observed live on
+    the cloud deployment 2026-07-07). Deepgram Aura (already covered by the
+    existing DEEPGRAM_API_KEY) picks up the turn so a quota blip degrades the
+    voice instead of killing the app.
+    """
+    cartesia_tts = cartesia.TTS(voice="f786b574-daa5-4673-aa0c-cbe3e8534c02")
+    if os.environ.get("DEEPGRAM_API_KEY"):
+        logger.info("TTS: FallbackAdapter [Cartesia primary -> Deepgram Aura fallback]")
+        return TTSFallbackAdapter([cartesia_tts, deepgram.TTS(model="aura-2-andromeda-en")])
+    logger.info("TTS: Cartesia only")
+    return cartesia_tts
+
+
 def build_llm():
     """Primary LLM with automatic failover.
 
@@ -703,7 +723,7 @@ async def entrypoint(ctx: JobContext):
             min_silence_duration=0.45,     # Give user breathing space to pause/think
         ),
         llm=build_llm(),
-        tts=cartesia.TTS(voice="f786b574-daa5-4673-aa0c-cbe3e8534c02"),
+        tts=build_tts(),
         turn_detection=inference.TurnDetector(),
         allow_interruptions=True,
         min_interruption_duration=0.3,

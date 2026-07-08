@@ -386,10 +386,22 @@ class ShopMaxAgent(Agent):
 
         if not product and product_name:
             name_lower = product_name.lower()
+            # Fast path: exact substring (a precise catalog name).
             for p in CATALOG:
                 if name_lower in p["name"].lower():
                     product = p
                     break
+            # Fuzzy fallback: a spoken/typed name rarely matches the full catalog
+            # name as a substring ("wireless headphones" vs "Wireless
+            # Noise-Cancelling Headphones"). Reuse the same scorer product_search
+            # uses so both tools recognize the same products. Pick the best match
+            # above threshold.
+            if not product:
+                best_score = 0.0
+                for p in CATALOG:
+                    s = _product_match_score(product_name, p)
+                    if s >= PRODUCT_MATCH_THRESHOLD and s > best_score:
+                        best_score, product = s, p
 
         if not product:
             return json.dumps({"found": False, "message": "Product not found. Please check the product name or ID."})

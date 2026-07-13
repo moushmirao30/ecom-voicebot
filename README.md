@@ -52,6 +52,15 @@ credits (avoiding a per-utterance failed handshake that audibly glitches the
 audio). Optional per-step routing sends tool-decision turns to the fast/cheap
 model and user-facing replies to the higher-quality one.
 
+**Watchable in production.** Every turn is logged end-to-end — `USER (turn)`,
+`TOOL: name(args) -> result`, `AGENT (reply)`, plus one line per LLM call
+(an empty completion logs at WARNING) — so a live bug is diagnosable straight
+from `lk agent logs` without reproduction. A **dead-air watchdog** speaks a
+recovery re-prompt if a user turn ever goes unanswered for 10 s, and setting
+`METRICS_JSONL` mirrors every event (turns, tool calls, latency metrics) as
+structured JSONL. Twenty live-found bugs (L1–L20), each with root cause and
+fix, are documented in [handoff.md](handoff.md).
+
 ## Measured latency
 
 Automated mic-free benchmark ([bench/latency_bench.py](bench/latency_bench.py)):
@@ -70,11 +79,12 @@ endpointing. Non-tool turns hit ~1.0 s.
 
 ## Evals caught real bugs
 
-The test suite (62 passing: 50 network-free unit + 12 live-LLM evals) combines
+The test suite (70 passing: 57 network-free unit + 13 live-LLM evals) combines
 deterministic tool/value assertions with LLM judges for hallucination,
 off-topic refusal, and multi-turn grounding — plus a regression test for every
 bug found by driving the deployed stack (dictated order IDs, invented category
-filters, plural-vs-singular policy queries, TTS provider selection, and more).
+filters, hyphenated product names, literal-"null" tool arguments,
+plural-vs-singular policy queries, TTS provider selection, and more).
 Two bugs the evals caught:
 
 1. **The "gaming laptops" hallucination.** Naive substring search returned a

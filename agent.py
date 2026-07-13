@@ -380,8 +380,16 @@ class ShopMaxAgent(Agent):
                 yield chunk
             return
 
-        chosen = self._reply_llm if _select_route(chat_ctx) == "reply" else self._tool_llm
+        route = _select_route(chat_ctx)
+        chosen = self._reply_llm if route == "reply" else self._tool_llm
         conn_options = self.session.conn_options.llm_conn_options
+        # (L20) One line per LLM call. The custom llm_node suppresses the
+        # framework's per-turn LLM metrics, which made an empty completion
+        # invisible: a live user turn got no tool call, no reply, no error, and
+        # no log trace for 55s. Zero chunks is the smoking gun for that, so it
+        # logs at WARNING.
+        started = time.time()
+        chunks = 0
         async with chosen.chat(
             chat_ctx=chat_ctx,
             tools=tools,
@@ -389,7 +397,13 @@ class ShopMaxAgent(Agent):
             conn_options=conn_options,
         ) as stream:
             async for chunk in stream:
+                chunks += 1
                 yield chunk
+        elapsed_ms = (time.time() - started) * 1000
+        if chunks == 0:
+            logger.warning(f"LLM ({route}): EMPTY completion (0 chunks) in {elapsed_ms:.0f} ms")
+        else:
+            logger.info(f"LLM ({route}): {chunks} chunks in {elapsed_ms:.0f} ms")
 
     @function_tool()
     async def product_search(
@@ -454,7 +468,17 @@ class ShopMaxAgent(Agent):
         await _publish_products(results, query=q or cat or "")
 
         if not results:
-            return json.dumps({"found": 0, "message": f"No products found matching '{q or cat}'."})
+            # Give the reply model the *right words* for the no-match case: with
+            # just "no products found" the 8B model sometimes says the item is
+            # "out of stock" (implying we sell it) — the flaky judge eval caught
+            # this. State plainly that ShopMax does not carry it.
+            return json.dumps({
+                "found": 0,
+                "message": (
+                    f"No products matching '{q or cat}'. ShopMax does not carry this item — "
+                    "do NOT describe it as out of stock. Suggest trying different keywords."
+                ),
+            })
 
         simplified = []
         for p in results:
@@ -900,6 +924,48 @@ async def entrypoint(ctx: JobContext):
 
     user_stop_time = 0.0
 
+    # (L20) Dead-air watchdog: a committed user turn once produced no tool call,
+    # no reply, no error, and no metrics for 55s (empty LLM completion is the
+    # working theory — nothing *fails*, so the FallbackAdapter never switches and
+    # the shopper gets silence). If no agent response has started within
+    # WATCHDOG_SECS of a user turn, speak a recovery re-prompt instead.
+    WATCHDOG_SECS = 10.0
+    watchdog_task: asyncio.Task | None = None
+
+    def _cancel_watchdog() -> None:
+        nonlocal watchdog_task
+        if watchdog_task is not None and not watchdog_task.done():
+            watchdog_task.cancel()
+        watchdog_task = None
+
+    async def _watchdog_fire() -> None:
+        await asyncio.sleep(WATCHDOG_SECS)
+        if session.agent_state in ("thinking", "speaking"):
+            # Alive but slow — never talk over a response in flight.
+            logger.warning(
+                f"dead-air watchdog: agent still {session.agent_state} "
+                f"{WATCHDOG_SECS:.0f}s after user turn; not intervening"
+            )
+            return
+        logger.warning(
+            f"dead-air watchdog fired: no response {WATCHDOG_SECS:.0f}s after "
+            "user turn — speaking recovery line"
+        )
+        if recorder:
+            recorder.record("dead_air_recovery")
+        try:
+            await session.say(
+                "Sorry, I seem to have lost my train of thought there. "
+                "Could you say that once more?"
+            )
+        except Exception:
+            logger.exception("dead-air recovery failed")
+
+    def _arm_watchdog() -> None:
+        nonlocal watchdog_task
+        _cancel_watchdog()
+        watchdog_task = asyncio.create_task(_watchdog_fire())
+
     @session.on("user_state_changed")
     def on_user_state_changed(event):
         nonlocal user_stop_time
@@ -911,6 +977,7 @@ async def entrypoint(ctx: JobContext):
     def on_agent_state_changed(event):
         nonlocal user_stop_time
         if event.new_state == "speaking":
+            _cancel_watchdog()  # (L20) a response is audibly under way
             agent_start_time = time.time()
             if user_stop_time > 0:
                 e2e_latency = agent_start_time - user_stop_time
@@ -982,6 +1049,11 @@ async def entrypoint(ctx: JobContext):
                     "user_turn" if role == "user" else "agent_reply",
                     text=item.text_content,
                 )
+        # (L20) Every user turn deserves *some* response within WATCHDOG_SECS.
+        if role == "user":
+            _arm_watchdog()
+        elif role == "assistant":
+            _cancel_watchdog()
 
     @session.on("function_tools_executed")
     def on_function_tools_executed(event):

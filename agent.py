@@ -235,14 +235,19 @@ def _product_match_score(query: str, product: dict) -> float:
     must fuzzily match a product token; the weakest token match is the score
     (precision). A strong de-spaced match rescues STT split-words like
     'head phones' -> 'headphones'."""
-    qtokens = [t for t in query.lower().split() if t not in _SEARCH_STOPWORDS and len(t) > 1]
+    # Tokenize on non-alphanumerics, not whitespace: catalog names use hyphens
+    # ("Noise-Cancelling"), so a whitespace split left "noise-cancelling" as one
+    # token and the precise query "noise cancelling headphones" scored 0.
+    qtokens = [
+        t for t in re.findall(r"[a-z0-9]+", query.lower())
+        if t not in _SEARCH_STOPWORDS and len(t) > 1
+    ]
     if not qtokens:
         return 0.0
-    ptokens = [
-        t for t in " ".join(
-            [product["name"], product["subcategory"], " ".join(product["colors"])]
-        ).lower().split() if t
-    ]
+    ptokens = re.findall(
+        r"[a-z0-9]+",
+        " ".join([product["name"], product["subcategory"], " ".join(product["colors"])]).lower(),
+    )
     if not ptokens:
         return 0.0
     min_cov = min(max(fuzz.ratio(q, p) for p in ptokens) for q in qtokens)
@@ -327,6 +332,7 @@ class ShopMaxAgent(Agent):
                 "- ORDER PRIVACY: Order details are private. Before looking up an order, you MUST first ask for the full name the order was placed under, then pass it to `order_status_lookup` as `customer_name`. If the result is not verified, politely ask the customer to confirm the exact name on the order and do NOT reveal any order status, items, or delivery information.\n"
                 "- When speaking an order ID or tracking number, read the characters and digits separately as provided in `order_id_spoken` or `tracking_number_spoken` (e.g., 'O R D one zero zero one'). Never pronounce it as a single word or a long number.\n"
                 "- If a tool returns no results, politely apologize and explain that you couldn't find a match, then thank them and ask them to try different keywords or rephrase. Use phrases like 'I am so sorry' or 'I apologize'.\n"
+                "- When calling `product_search`, pass the user's own noun phrase as the query (e.g. they say 'headphones' -> query='headphones'). NEVER substitute a broader category or attribute word ('audio', 'wireless', 'electronics'): the shopper sees the raw results on screen, so a broadened query makes the on-screen grid disagree with what you say.\n"
                 "- Refer to products by their EXACT names from the tool results. Never relabel a product as the thing the user asked for if the names differ (e.g. if they ask for 'gaming laptops' and the tool returns a keyboard, do NOT call it a laptop). If nothing genuinely matches, say so.\n"
                 "- All prices are in Indian Rupees. The tools give you a ready-to-speak form of every amount (the `price_spoken` / `total_spoken` fields). When saying a price out loud, READ THAT SPOKEN FORM VERBATIM; never convert digits to words yourself and never read out the ₹ symbol.\n"
                 "- Keep replies brief (1-3 sentences). Ask one question at a time.\n"
@@ -334,7 +340,8 @@ class ShopMaxAgent(Agent):
                 "- Do not reveal tool names, parameters, or internal reasoning to the user.\n\n"
                 "# Error Recovery & Safety Rules\n"
                 "- If the user input is empty, extremely short (like a single letter or random noise), garbled, or contains only filler words (like 'um', 'uh'), respond with a very polite clarification request containing courtesy words. For example: 'I am so sorry, I didn't quite catch that. Could you please repeat or rephrase your request? Thank you!'\n"
-                "- If the user asks about something completely outside ShopMax's scope (e.g. general knowledge, coding, weather, personal advice), politely decline and redirect using extreme courtesy. For example: 'I am very sorry, but I specialize in shopping assistance for ShopMax and cannot help with other topics. Thank you for your understanding! Could you please let me know how I can help you with our products, orders, or policies instead?' NEVER use this refusal for anything about products, prices, stock, orders, the cart, or store policies — those are your job: call the matching tool instead.\n\n"
+                "- If the user asks about something completely outside ShopMax's scope (e.g. general knowledge, coding, weather, personal advice), politely decline and redirect using extreme courtesy. For example: 'I am very sorry, but I specialize in shopping assistance for ShopMax and cannot help with other topics. Thank you for your understanding! Could you please let me know how I can help you with our products, orders, or policies instead?' NEVER use this refusal for anything about products, prices, stock, orders, the cart, or store policies — those are your job: call the matching tool instead.\n"
+                "- SPEECH RECOGNITION QUIRK: the transcript often renders 'cart' as 'car' or 'card'. If the user mentions their 'car total', 'car items', or asks about their 'car'/'card' in a shopping context (total, items, checkout, adding or removing products), they mean their CART — call `view_cart`. Never refuse these as off-topic and never answer about vehicles or payment cards.\n\n"
                 "# What you can help with\n"
                 "1. **Product search**: Find products by name, category, color, or type.\n"
                 "2. **Stock and price check**: Check if a specific product is in stock, its price, available colors and sizes.\n"
@@ -395,7 +402,7 @@ class ShopMaxAgent(Agent):
         """Search for products in the ShopMax catalog by name, description, or category.
 
         Args:
-            query: Search keywords like product name, type, or description (e.g. 'blue jacket', 'headphones', 'kurta').
+            query: The product the user asked for, IN THE USER'S OWN WORDS (e.g. 'blue jacket', 'headphones', 'kurta'). Never broaden it to a category or attribute word like 'audio', 'wireless', or 'electronics' — a broadened query returns unrelated products and the results grid the shopper sees will not match what they asked for.
             category: Optional category filter. One of: 'fashion', 'electronics', 'home'. Leave empty to search all.
             max_results: Maximum number of results to return. Default is 5.
         """
@@ -598,8 +605,10 @@ class ShopMaxAgent(Agent):
         """Read the items currently in the shopper's on-screen cart and the total.
 
         Use this to answer questions like "what's in my cart?", "how many items do
-        I have?", or "what's my total?". The cart lives in the web UI; this returns
-        its current contents (with a ready-to-speak total in `total_spoken`)."""
+        I have?", or "what's my total?". Also use it when STT mishears 'cart' —
+        "what's my car total?", "what's in my card?" — those are cart questions.
+        The cart lives in the web UI; this returns its current contents (with a
+        ready-to-speak total in `total_spoken`)."""
         return json.dumps(self._cart_summary())
 
     @function_tool()
@@ -821,7 +830,14 @@ async def entrypoint(ctx: JobContext):
 
     # Configure STT, LLM, TTS, and Turn Detector
     session = AgentSession(
-        stt=deepgram.STT(model="nova-3"),
+        stt=deepgram.STT(
+            model="nova-3",
+            # Boost domain words nova-3 kept mishearing in live runs: "cart" came
+            # through as "car" ("what's my car total?"), which then hit the
+            # off-topic refusal instead of view_cart. Keyterm prompting biases
+            # recognition toward these without affecting general accuracy.
+            keyterm=["cart", "ShopMax", "COD", "kurta", "saree", "Anarkali"],
+        ),
         vad=inference.VAD(
             model="silero",
             min_speech_duration=0.15,      # Filter brief noises / clearing throat
@@ -897,6 +913,35 @@ async def entrypoint(ctx: JobContext):
                     duration_ms=round(m.duration * 1000, 2),
                     audio_ms=round(m.audio_duration * 1000, 2),
                 )
+
+    # (#L13) Conversation observability: the deployed log previously carried only
+    # infra/metrics lines, so live wrong-answer bugs (miscounted search results,
+    # 'cart' -> 'car' mis-transcriptions) could not be diagnosed from the logs.
+    # Log every final user transcript, agent reply, and tool call with its
+    # arguments and result, and mirror them into the JSONL sink when enabled.
+
+    @session.on("user_input_transcribed")
+    def on_user_input_transcribed(event):
+        if event.is_final:
+            logger.info(f"USER (final transcript): {event.transcript!r}")
+            if recorder:
+                recorder.record("user_transcript", text=event.transcript)
+
+    @session.on("conversation_item_added")
+    def on_conversation_item_added(event):
+        item = event.item
+        if getattr(item, "role", None) == "assistant" and item.text_content:
+            logger.info(f"AGENT (reply): {item.text_content!r}")
+            if recorder:
+                recorder.record("agent_reply", text=item.text_content)
+
+    @session.on("function_tools_executed")
+    def on_function_tools_executed(event):
+        for call, output in event.zipped():
+            result = output.output if output is not None else None
+            logger.info(f"TOOL: {call.name}({call.arguments}) -> {result}")
+            if recorder:
+                recorder.record("tool_call", name=call.name, args=call.arguments, output=result)
 
     # Create the agent and wire the on-screen cart: the web UI pushes the current
     # cart over CART_TOPIC; store it on the agent so `view_cart` can read it.

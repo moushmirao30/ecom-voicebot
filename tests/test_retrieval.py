@@ -40,6 +40,16 @@ def test_split_word_stt_artifact_matches():
     assert _product_match_score("head phones", hp) >= PRODUCT_MATCH_THRESHOLD
 
 
+def test_hyphenated_catalog_name_matches_unhyphenated_query():
+    # Live bug: "noise cancelling headphones" scored 0 because the whitespace
+    # tokenizer left "noise-cancelling" as one token. Tokens now split on
+    # non-alphanumerics, so hyphenated names match their spoken form.
+    hp = _named("Wireless Noise-Cancelling Headphones")
+    assert _product_match_score("noise cancelling headphones", hp) >= PRODUCT_MATCH_THRESHOLD
+    charger = _named("USB-C Fast Charger 65W")
+    assert _product_match_score("usb c charger", charger) >= PRODUCT_MATCH_THRESHOLD
+
+
 def test_search_adjectives_are_filtered():
     # Adjectives like "cheap", "best", "premium" should be filtered out.
     kurta = _named("Classic Cotton Kurta")

@@ -397,12 +397,12 @@ class ShopMaxAgent(Agent):
         context: RunContext,
         query: str,
         category: str | None = None,
-        max_results: int = 5,
+        max_results: int | str = 5,
     ) -> str:
         """Search for products in the ShopMax catalog by name, description, or category.
 
         Args:
-            query: The product the user asked for, IN THE USER'S OWN WORDS (e.g. 'blue jacket', 'headphones', 'kurta'). Never broaden it to a category or attribute word like 'audio', 'wireless', or 'electronics' — a broadened query returns unrelated products and the results grid the shopper sees will not match what they asked for.
+            query: The product the user asked for, IN THE USER'S OWN WORDS (e.g. 'blue jacket', 'headphones', 'kurta'). Never broaden it to a category or attribute word like 'audio', 'wireless', or 'electronics' — a broadened query returns unrelated products and the results grid the shopper sees will not match what they asked for. To browse a whole category ('show me fashion products'), pass an empty query with `category` set.
             category: Optional category filter. One of: 'fashion', 'electronics', 'home'. Leave empty to search all.
             max_results: Maximum number of results to return. Default is 5.
         """
@@ -416,24 +416,45 @@ class ShopMaxAgent(Agent):
         if cat not in _CATALOG_CATEGORIES:
             cat = None
 
-        scored = []
-        for product in CATALOG:
-            # Category filter
-            if cat and product["category"].lower() != cat:
-                continue
-            score = _product_match_score(query, product)
-            if score >= PRODUCT_MATCH_THRESHOLD:
-                scored.append((score, product))
+        # (L18) Tolerate the tool model's literal-"null" habit on every arg, not
+        # just category: 'show me fashion products' arrived live as
+        # {"query": "null", "max_results": "null", "category": "fashion"} and
+        # dead-ended in a pydantic int-parse error before the tool body ran.
+        try:
+            n = max(1, int(max_results))
+        except (TypeError, ValueError):
+            n = 5
+        q = (query or "").strip()
+        if q.lower() in ("null", "none"):
+            q = ""
 
-        # Best matches first; absent products score below threshold and are dropped.
-        scored.sort(key=lambda sp: sp[0], reverse=True)
-        results = [product for _, product in scored[:max_results]]
+        if not q:
+            if not cat:
+                return json.dumps({
+                    "found": 0,
+                    "message": "I need either a product to search for or a category to browse. What are you looking for?",
+                })
+            # Category browse: no search terms, just show the shelf.
+            results = [p for p in CATALOG if p["category"].lower() == cat][:n]
+        else:
+            scored = []
+            for product in CATALOG:
+                # Category filter
+                if cat and product["category"].lower() != cat:
+                    continue
+                score = _product_match_score(q, product)
+                if score >= PRODUCT_MATCH_THRESHOLD:
+                    scored.append((score, product))
+
+            # Best matches first; absent products score below threshold and are dropped.
+            scored.sort(key=lambda sp: sp[0], reverse=True)
+            results = [product for _, product in scored[:n]]
 
         # Surface the result (including "nothing found") in the frontend grid (best-effort).
-        await _publish_products(results, query=query)
+        await _publish_products(results, query=q or cat or "")
 
         if not results:
-            return json.dumps({"found": 0, "message": f"No products found matching '{query}'."})
+            return json.dumps({"found": 0, "message": f"No products found matching '{q or cat}'."})
 
         simplified = []
         for p in results:
@@ -446,7 +467,24 @@ class ShopMaxAgent(Agent):
                 "category": p["category"],
             })
 
-        return json.dumps({"found": len(simplified), "products": simplified})
+        # (L17) The narration rule must ride WITH the result, not only in the
+        # distant system prompt: with found=1 the reply model was still reciting
+        # the 'top two products… others on screen' template (observed twice on
+        # the deployed stack, 2026-07-13 evening). A per-result note is weighted
+        # far more reliably than a system-prompt conditional.
+        if len(simplified) == 1:
+            note = (
+                "Exactly ONE product matched and it is the only item on the shopper's screen. "
+                "Describe just this one product. Do NOT mention other products, a list, or "
+                "anything else being shown on the screen."
+            )
+        else:
+            note = (
+                f"{len(simplified)} products matched and all {len(simplified)} are shown on the "
+                "shopper's screen. Mention the top 2 by name and note the rest are on screen."
+            )
+
+        return json.dumps({"found": len(simplified), "note": note, "products": simplified})
 
     @function_tool()
     async def stock_and_price_check(
@@ -929,11 +967,21 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("conversation_item_added")
     def on_conversation_item_added(event):
+        # (L19) User turns are logged from here, not only user_input_transcribed:
+        # that event never fired on the deployed pipeline (observed 2026-07-13 —
+        # two full live sessions produced zero USER lines), while committed user
+        # messages reliably flow through conversation_item_added. This is also
+        # the better signal: it's the exact text the LLM saw for the turn.
         item = event.item
-        if getattr(item, "role", None) == "assistant" and item.text_content:
-            logger.info(f"AGENT (reply): {item.text_content!r}")
+        role = getattr(item, "role", None)
+        if role in ("user", "assistant") and item.text_content:
+            label = "USER (turn)" if role == "user" else "AGENT (reply)"
+            logger.info(f"{label}: {item.text_content!r}")
             if recorder:
-                recorder.record("agent_reply", text=item.text_content)
+                recorder.record(
+                    "user_turn" if role == "user" else "agent_reply",
+                    text=item.text_content,
+                )
 
     @session.on("function_tools_executed")
     def on_function_tools_executed(event):

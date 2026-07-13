@@ -49,3 +49,49 @@ async def test_valid_category_filter_still_filters():
 async def test_valid_category_filter_passes_matches():
     result = await _search(query="cotton kurta", category="fashion")
     assert result["found"] >= 1
+
+
+# --- L18: literal-"null" args + category browse (live 2026-07-13 evening) ---
+# "show me fashion products" arrived as this exact payload and crashed at
+# pydantic validation, looping the agent into apologies.
+
+
+async def test_live_null_args_payload_browses_the_category():
+    result = await _search(query="null", max_results="null", category="fashion")
+    assert result["found"] >= 1
+    assert all(p["category"] == "fashion" for p in result["products"])
+
+
+async def test_empty_query_with_category_browses():
+    result = await _search(query="", category="electronics")
+    assert result["found"] >= 1
+    assert all(p["category"] == "electronics" for p in result["products"])
+
+
+async def test_empty_query_without_category_asks_instead_of_erroring():
+    result = await _search(query="none")
+    assert result["found"] == 0
+    assert "message" in result
+
+
+async def test_max_results_string_number_is_coerced():
+    result = await _search(query="", category="fashion", max_results="3")
+    assert 1 <= result["found"] <= 3
+
+
+# --- L17: the narration rule rides with the result -------------------------
+# With found=1 the reply model recited the "top two products… others on
+# screen" template anyway (2x live); a per-result note pins the count.
+
+
+async def test_single_match_carries_describe_only_this_note():
+    result = await _search(query="headphones")
+    assert result["found"] == 1
+    assert "ONE product" in result["note"]
+    assert "Do NOT mention other products" in result["note"]
+
+
+async def test_multi_match_note_states_the_exact_count():
+    result = await _search(query="", category="fashion")
+    assert result["found"] > 1
+    assert str(result["found"]) in result["note"]

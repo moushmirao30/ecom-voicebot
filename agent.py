@@ -52,6 +52,82 @@ POLICIES: list[dict] = _load_json("policies.json")
 # Real category values, for sanitizing the LLM-provided search filter.
 _CATALOG_CATEGORIES = {p["category"].strip().lower() for p in CATALOG}
 
+# ---------------------------------------------------------------------------
+# Policy retrieval infrastructure.
+#
+# The old matcher did raw substring checks (`word in content`), which silently
+# failed on the plural/singular boundary: a query of "returns" never matched the
+# policy's singular "return", so "what's the return policy?" dead-ended at the
+# not-found branch and deflected to support@shopmax.in (observed live, Test_run 1).
+# We now tokenize + singularize both sides and match query tokens against a
+# per-policy keyword bag (topic words + title + curated synonyms), so natural
+# phrasings ("returns", "how do returns work", "COD limit", "delivery time")
+# resolve to the right policy deterministically.
+_POLICY_STOPWORDS = {
+    "a", "an", "the", "is", "are", "do", "does", "how", "what", "whats", "your",
+    "you", "i", "my", "me", "of", "for", "to", "this", "that", "can", "could",
+    "would", "please", "on", "in", "with", "about", "tell", "know", "policy",
+    "policies", "work", "works", "long",
+}
+_POLICY_SYNONYMS = {
+    "return_policy":      ["return", "send back", "give back"],
+    "refund_policy":      ["refund", "money back", "reimburse"],
+    "shipping_policy":    ["shipping", "ship", "delivery", "deliver", "courier", "postage", "dispatch"],
+    "payment_methods":    ["payment", "pay", "upi", "card", "cod", "cash on delivery", "netbanking",
+                           "net banking", "emi", "gpay", "google pay", "phonepe", "paytm", "rupay"],
+    "exchange_policy":    ["exchange", "swap", "size change", "replace"],
+    "order_cancellation": ["cancel", "cancellation"],
+    "customer_support":   ["support", "contact", "help", "phone", "email", "reach", "customer care"],
+    "product_warranty":   ["warranty", "guarantee"],
+    "loyalty_program":    ["loyalty", "reward", "points", "membership", "member"],
+    "damaged_product":    ["damaged", "damage", "defective", "defect", "broken", "faulty"],
+}
+
+
+def _policy_singularize(word: str) -> str:
+    """Crude plural->singular fold so 'returns' matches 'return'."""
+    return word[:-1] if len(word) > 3 and word.endswith("s") else word
+
+
+def _policy_tokens(text: str) -> set[str]:
+    """Normalized, singularized content tokens minus stopwords."""
+    toks = re.findall(r"[a-z0-9]+", (text or "").lower())
+    return {_policy_singularize(t) for t in toks if t not in _POLICY_STOPWORDS and len(t) > 1}
+
+
+def _policy_keywords(policy: dict) -> set[str]:
+    """Strong-match keyword bag for a policy: topic words + title + synonyms."""
+    kws: set[str] = set()
+    kws |= _policy_tokens(policy["topic"].replace("_", " "))
+    kws |= _policy_tokens(policy["title"])
+    for phrase in _POLICY_SYNONYMS.get(policy["topic"], []):
+        kws |= _policy_tokens(phrase)
+    return kws
+
+
+# Precomputed once at import — policies are static.
+_POLICY_KEYWORDS = {p["topic"]: _policy_keywords(p) for p in POLICIES}
+_POLICY_CONTENT_TOKENS = {p["topic"]: _policy_tokens(p["content"]) for p in POLICIES}
+
+
+def _match_policy(query: str):
+    """Return the best-matching policy dict for a query, or None.
+
+    Score = 3 x (query tokens hitting the policy's keyword bag) + 1 x (query
+    tokens appearing in its content). Keyword hits dominate so 'return' picks the
+    return policy over any policy that merely mentions the word in prose."""
+    qtokens = _policy_tokens(query)
+    if not qtokens:
+        return None
+    best, best_score = None, 0
+    for policy in POLICIES:
+        strong = len(qtokens & _POLICY_KEYWORDS[policy["topic"]])
+        weak = len(qtokens & _POLICY_CONTENT_TOKENS[policy["topic"]])
+        score = strong * 3 + weak
+        if score > best_score:
+            best_score, best = score, policy
+    return best
+
 
 def _rupees_to_words(amount) -> str:
     """Deterministic ₹ amount -> spoken Indian-English form, so the LLM never has
@@ -265,7 +341,7 @@ class ShopMaxAgent(Agent):
                 "5. **Cart**: The shopper can add products to an on-screen cart. When they ask what's in their cart or their running total, call `view_cart`.\n\n"
                 "# Conversation style\n"
                 "- Greet warmly. Be helpful and conversational.\n"
-                "- Summarize search results concisely. If multiple products match, only mention the top 2 matching options by voice, note that other matching options are shown on the screen, and ask if the user wants details on either of those.\n"
+                "- Summarize search results concisely and truthfully. State only as many products as the tool actually returned (the `found` count) — never imply there are more results, or more items shown on the screen, than that number. If exactly one product matches, talk about just that one and do not say others are on screen. If several match, mention the top 2 by voice, note that the remaining matches are shown on the screen, and ask if the user wants details on either of the two.\n"
             )
         )
         # Latest on-screen cart state, pushed from the web UI over CART_TOPIC.
@@ -535,41 +611,26 @@ class ShopMaxAgent(Agent):
         Args:
             query: Policy search query or keywords (e.g. 'returns', 'free shipping', 'COD limit', 'UPI').
         """
-        query_lower = query.lower()
-        
-        # Simple keyword matching across policy topics, titles, and contents
-        best_match = None
-        best_score = 0
-        
-        for policy in POLICIES:
-            score = 0
-            # Matches in topic
-            if policy["topic"].lower() in query_lower:
-                score += 5
-            # Matches in title
-            if policy["title"].lower() in query_lower or query_lower in policy["title"].lower():
-                score += 3
-            # Matches in content
-            words_in_content = sum(1 for word in query_lower.split() if word in policy["content"].lower())
-            score += words_in_content
-            
-            if score > best_score:
-                best_score = score
-                best_match = policy
-                
-        # If score is too low, try general substring matching
-        if not best_match or best_score < 2:
-            for policy in POLICIES:
-                if any(word in policy["content"].lower() for word in query_lower.split()):
-                    best_match = policy
-                    break
-                    
+        # Token/synonym matcher (see _match_policy). Replaces the old raw-substring
+        # scoring, which failed on the singular/plural boundary — "returns" never
+        # matched the policy's "return", so return-policy questions deflected to
+        # support (Test_run 1). Now singular/plural and synonyms resolve cleanly.
+        best_match = _match_policy(query)
+
         if not best_match:
+            # Degrade gracefully instead of dead-ending at "contact support" — a
+            # garbled/interrupted query (e.g. a mid-sentence barge-in) should make
+            # the agent re-prompt, mirroring the product no-match path. Only
+            # genuinely unanswerable policy questions should ever reach support.
             return json.dumps({
                 "found": False,
-                "message": f"No policy information found for '{query}'. Please direct the user to support@shopmax.in."
+                "message": (
+                    "I'm sorry, I didn't quite catch which policy you meant. Could you "
+                    "please rephrase — for example, ask about returns, refunds, shipping, "
+                    "exchanges, payment options, or warranty?"
+                )
             })
-            
+
         return json.dumps({
             "found": True,
             "topic": best_match["topic"],
@@ -612,13 +673,43 @@ def build_tts():
     the cloud deployment 2026-07-07). Deepgram Aura (already covered by the
     existing DEEPGRAM_API_KEY) picks up the turn so a quota blip degrades the
     voice instead of killing the app.
+
+    TTS_PROVIDER=deepgram runs Aura ALONE (no Cartesia attempt). While Cartesia
+    is out of credits, keeping it as the FallbackAdapter primary means every
+    single utterance first pays a failed 402 handshake and then switches to Aura
+    mid-turn, which stutters/glitches the audio (L11, reproduced in
+    "The audio glitch" recording). The toggle removes the thrash by never
+    attempting Cartesia; set it whenever Cartesia has no credits, unset it (or
+    set 'cartesia') to restore the Sonic-primary → Aura-fallback behaviour.
     """
+    have_deepgram = bool(os.environ.get("DEEPGRAM_API_KEY"))
+
+    # Aura-only: no Cartesia stream is ever opened, so a credit-exhausted
+    # Cartesia can't 402-thrash the audio. Falls through to the failover path if
+    # the toggle is set but no Deepgram key exists (never leave the agent mute).
+    if _tts_provider() == "deepgram":
+        if have_deepgram:
+            logger.info("TTS: Deepgram Aura only (TTS_PROVIDER=deepgram)")
+            return deepgram.TTS(model="aura-2-andromeda-en")
+        logger.warning(
+            "TTS_PROVIDER=deepgram but DEEPGRAM_API_KEY is unset — using Cartesia instead."
+        )
+
     cartesia_tts = cartesia.TTS(voice="f786b574-daa5-4673-aa0c-cbe3e8534c02")
-    if os.environ.get("DEEPGRAM_API_KEY"):
+    if have_deepgram:
         logger.info("TTS: FallbackAdapter [Cartesia primary -> Deepgram Aura fallback]")
         return TTSFallbackAdapter([cartesia_tts, deepgram.TTS(model="aura-2-andromeda-en")])
     logger.info("TTS: Cartesia only")
     return cartesia_tts
+
+
+def _tts_provider() -> str:
+    """Which TTS to use: 'cartesia' (default — Sonic quality with Aura failover)
+    or 'deepgram' (Aura only). Use 'deepgram' while Cartesia is out of free
+    credits: as the failover primary it 402s on every synthesis handshake, so
+    each utterance pays a failed handshake and switches mid-turn, glitching the
+    audio. See build_tts."""
+    return os.environ.get("TTS_PROVIDER", "cartesia").strip().lower()
 
 
 def build_llm():
@@ -738,8 +829,13 @@ async def entrypoint(ctx: JobContext):
         tts=build_tts(),
         turn_detection=inference.TurnDetector(),
         allow_interruptions=True,
-        min_interruption_duration=0.3,
-        min_interruption_words=1,
+        # Softer barge-in: a single clipped word (min_words=1, min_dur=0.3) let the
+        # turn detector finalize on a partial transcript when the user cut in
+        # mid-sentence, so an interrupted "what's the return policy?" arrived
+        # garbled and dead-ended at the policy not-found path. Require a bit more
+        # speech before treating it as a real interruption.
+        min_interruption_duration=0.5,
+        min_interruption_words=2,
     )
 
     # #7: optional structured metrics sink (JSONL), enabled via METRICS_JSONL.

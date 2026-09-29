@@ -31,3 +31,8 @@ Thumbs.db
 
 # Runtime metrics output
 *.jsonl
+
+# Internal working notes (kept locally, not published)
+handoff.md
+livekit_voicebot_plan_v*.md
+demo/DEMO_SCRIPT.md
